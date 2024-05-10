@@ -1,7 +1,7 @@
 #dynamic_extract function for chlorophyll file structure
 #extracts variables to points based on the day and year of that point
 #requires terra, tidyterra, dplyr, and lubridate
-#tracks must have a datetime column called date and be a SpatVector
+#tracks must have a datetime or date column called date and be a SpatVector
 
 dynamic_chlorophyll <- function(predictor, tracks){
   

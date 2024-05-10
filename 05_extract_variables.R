@@ -1,5 +1,4 @@
 #script for extracting environmental variables to tracks and pseudoabsences
-#RUN SOES WAP POST-MOULT
 rm(list=ls())
 setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
