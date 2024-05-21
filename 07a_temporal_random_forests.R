@@ -1,25 +1,21 @@
 #automated script to run Random Forests for leave-year-out validation
-#Change cv_scheme to 10?
-#cross validation over individuals? how for pseudo-abs?
 rm(list=ls())
-setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
+setwd("/mainfs/home/jcw2g17/Chapter 01/")
+
 
 {
   library(dplyr)
-  library(lubridate)
   library(ranger)
   library(caret)
   library(miceRanger)
   library(enmSdmX)
-  library(flexsdm)
+  library(lubridate)
 }
 
 meta <- read.csv("data/species_site_stage_metadata.csv")
 predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope")
-
 for(z in 1:19){
-try({
-  
+  try({
 #define parameters in loop
 rm(list=setdiff(ls(), c("meta", "predictors", "z")))
 this.species <- meta[z, 1]
@@ -27,7 +23,7 @@ this.site <- meta[z, 2]
 this.stage <- meta[z, 3]
 season <- meta[z, 4]
 
-# 1. Formatting
+# 1. Formatting 
 #read in presences and pseudo-absences
 tracks <- read.csv(paste0("output/extraction/", this.species, "/", this.site, "/", this.stage, "/presences.csv"))
 buff <- read.csv(paste0("output/extraction/", this.species, "/", this.site, "/", this.stage, "/buffers.csv"))
@@ -46,9 +42,6 @@ tracks <- tracks %>% select(all_of(columns))
 buff <- buff %>% select(all_of(columns))
 back <- back %>% select(all_of(columns))
 crw <- crw %>% select(all_of(columns))
-
-#keep background points for testing
-back_test <- back
 
 #rbind for models
 buff <- rbind(tracks, buff)
@@ -117,7 +110,7 @@ predictors <- names(pred_check)
 #create parameter grid to vary mtry between 2, 3, and 4
 param_grid <- expand.grid(mtry=2:4, splitrule = "gini", min.node.size=1)
 
-#setup 5-fold cross-validation
+#setup 10-fold cross-validation
 cv_scheme <- trainControl(method = "cv", number = 10, verboseIter = FALSE,
                           summaryFunction = twoClassSummary, classProbs = TRUE)
 
@@ -150,7 +143,7 @@ if(sum(is.na(buff_sel)) > 0.1*nrow(buff_sel)){
 X <- buff_sel %>% select(-pa)
 Y <- as.factor(buff_sel$pa)
 buff_rf <- train(x = X, y = Y, method = "ranger", metric = "ROC", trControl = cv_scheme, 
-                 tuneGrid = param_grid, num.trees = 1000, importance = "impurity")
+                 tuneGrid = param_grid, num.trees = 1000, importance = "impurity", allowParallel = TRUE)
 
 #save mtry results
 buff_mtry <- buff_rf$results[,c(1,4)]
@@ -195,7 +188,7 @@ if(sum(is.na(back_sel)) > 0.1*nrow(back_sel)){
 X <- back_sel %>% select(-pa)
 Y <- as.factor(back_sel$pa)
 back_rf <- train(x = X, y = Y, method = "ranger", metric = "ROC", trControl = cv_scheme, 
-                 tuneGrid = param_grid, num.trees = 1000, importance = "impurity")
+                 tuneGrid = param_grid, num.trees = 1000, importance = "impurity", allowParallel = TRUE)
 
 #save mtry results
 back_mtry <- back_rf$results[,c(1,4)]
@@ -239,7 +232,7 @@ if(sum(is.na(crw_sel)) > 0.1*nrow(crw_sel)){
 X <- crw_sel %>% select(-pa)
 Y <- as.factor(crw_sel$pa)
 crw_rf <- train(x = X, y = Y, method = "ranger", metric = "ROC", trControl = cv_scheme, 
-                 tuneGrid = param_grid, num.trees = 1000, importance = "impurity")
+                 tuneGrid = param_grid, num.trees = 1000, importance = "impurity", allowParallel = TRUE)
 
 #save mtry results
 crw_mtry <- crw_rf$results[,c(1,4)]
@@ -251,7 +244,7 @@ p1 <- predict(crw_rf, tracks_test, type = "prob")[,2]
 p2 <- predict(crw_rf, back_test, type = "prob")[,2]
 crw_rf_boyce <- evalContBoyce(p1, p2)
 
-#save model to scratch
+#save model
 saveRDS(crw_rf, 
         file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/crw_rf_", this.test, ".RDS"))
 
