@@ -52,9 +52,6 @@ foreach(z = 1:21) %dopar% {
     back <- back %>% select(all_of(columns))
     crw <- crw %>% select(all_of(columns))
     
-    #keep background points for testing
-    back_test <- back
-    
     #rbind for models
     buff <- rbind(tracks, buff)
     back <- rbind(tracks, back)
@@ -154,7 +151,7 @@ foreach(z = 1:21) %dopar% {
       
       #save parameter results
       buff_params <- buff_gbm$bestTune
-      buff_params$pseudo <- "buffer"
+      buff_params$pseudo <- "buff"
       buff_params$season <- i
       
       #predict and evaluate
@@ -190,7 +187,7 @@ foreach(z = 1:21) %dopar% {
       
       #save parameter results
       back_params <- back_gbm$bestTune
-      back_params$pseudo <- "backer"
+      back_params$pseudo <- "back"
       back_params$season <- i
       
       #predict and evaluate
@@ -226,7 +223,7 @@ foreach(z = 1:21) %dopar% {
       
       #save parameter results
       crw_params <- crw_gbm$bestTune
-      crw_params$pseudo <- "crwer"
+      crw_params$pseudo <- "crw"
       crw_params$season <- i
       
       #predict and evaluate

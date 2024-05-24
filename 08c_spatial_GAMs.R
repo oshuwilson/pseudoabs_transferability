@@ -1,4 +1,4 @@
-#automated script to run GAMs for leave-year-out validation
+#automated script to run GAMs for spatial transfer validation
 rm(list=ls())
 setwd("/mainfs/home/jcw2g17/Chapter 01/")
 
