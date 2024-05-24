@@ -11,8 +11,6 @@ setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
   library(lubridate)
   library(CCAMLRGIS)
   library(ggplot2)
-  library(parallel)
-  library(parallelMap)
 }
 
 #sf coast file 
@@ -59,7 +57,7 @@ tracks_terra <- project(tracks_terra, "EPSG:6932")
 plot(tracks_terra, pch = ".")
 
 
-# 3. Fit minimum convex hull -- ADD BUFFER????
+# 3. Fit minimum convex hull
 #convert to sf
 tracks_sf <- st_as_sf(tracks_terra)
 
@@ -86,7 +84,6 @@ rm(mch_sf, tracks, tracks_terra, crop_coast, coast_buff)
 
 
 # 4. Create background points - can take a while 
-parallelStartSocket(cpus = 8) #parallelize to speed up
 
 suppressMessages( #suppressing message that prints when temporal.buffer = 0
   background <- spatiotemp_pseudoabs(occ.data=train_tracks, 
@@ -97,7 +94,6 @@ suppressMessages( #suppressing message that prints when temporal.buffer = 0
                      n.pseudoabs = nrow(train_tracks),
                      prj = "+proj=laea +lat_0=-90 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"))
 
-parallelStop()
 
 plot(mch_masked)
 terra::plot(terra::vect(background[, c("x", "y")],
