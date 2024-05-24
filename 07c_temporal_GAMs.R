@@ -11,7 +11,7 @@ setwd("/mainfs/home/jcw2g17/Chapter 01/")
   library(doParallel)
 }
 
-#GAM function to only use predictors with <10% NAs and exclude SIC if all 0
+#GAM function to only use predictors that remain after later steps remove some
 pred_gam <- function(df){
   mgcv::gam(
     as.formula(
@@ -23,16 +23,19 @@ pred_gam <- function(df){
     family=binomial, data=df)
 }
 
-#read in metadata and base predictors
+#read in table with info for each species, site and stage
 meta <- read.csv("data/species_site_stage_metadata_GAMs.csv")
+
+#define initial predictors
 predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope")
 
-#parallelise
+#setup parallel programming
 registerDoParallel(cores = 21)
 
-#run loop
+#loop to run through each species, stage, and site iteratively
 foreach(z=1:21) %dopar% {
   try({
+    
     #define parameters in loop
     rm(list=setdiff(ls(), c("meta", "predictors", "z", "pred_gam")))
     this.species <- meta[z, 1]
@@ -96,7 +99,7 @@ foreach(z=1:21) %dopar% {
     #null tables for output
     gam_boyce_final <- NULL
     
-    #loop starts here
+    #loop over each season
     for(i in seasons){
       this.test <- i
       
@@ -118,6 +121,7 @@ foreach(z=1:21) %dopar% {
       }
       
       predictors <- names(pred_check)
+      
       
       # 3. Run GAMs
       
@@ -141,7 +145,7 @@ foreach(z=1:21) %dopar% {
       #predict and evaluate
       p1 <- predict.gam(buff_gam, tracks_test, type = "response")
       p2 <- predict.gam(buff_gam, back_test, type = "response")
-      buff_gam_boyce <- evalContBoyce(p1, p2)
+      buff_gam_boyce <- evalContBoyce(p1, p2, na.rm=TRUE)
       
       #save model
       saveRDS(buff_gam, 
@@ -171,7 +175,7 @@ foreach(z=1:21) %dopar% {
       #predict and evaluate
       p1 <- predict.gam(back_gam, tracks_test, type = "response")
       p2 <- predict.gam(back_gam, back_test, type = "response")
-      back_gam_boyce <- evalContBoyce(p1, p2)
+      back_gam_boyce <- evalContBoyce(p1, p2, na.rm=TRUE)
       
       #save model
       saveRDS(back_gam, 
@@ -201,7 +205,7 @@ foreach(z=1:21) %dopar% {
       #predict and evaluate
       p1 <- predict.gam(crw_gam, tracks_test, type = "response")
       p2 <- predict.gam(crw_gam, back_test, type = "response")
-      crw_gam_boyce <- evalContBoyce(p1, p2)
+      crw_gam_boyce <- evalContBoyce(p1, p2, na.rm=TRUE)
       
       #save model
       saveRDS(crw_gam, 

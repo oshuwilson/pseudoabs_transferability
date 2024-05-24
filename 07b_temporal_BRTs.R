@@ -1,7 +1,6 @@
 #automated script to run Boosted Regression Trees for leave-year-out validation
 rm(list=ls())
-#setwd("/mainfs/home/jcw2g17/Chapter 01/")
-setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
+setwd("/mainfs/home/jcw2g17/Chapter 01/")
 
 {
   library(dplyr)
@@ -9,12 +8,21 @@ setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
   library(gbm)
   library(enmSdmX)
   library(lubridate)
+  library(foreach)
+  library(doParallel)
 }
 
-meta <- read.csv("data/species_site_stage_metadata.csv")
+#read in table with info for each species, site and stage
+meta <- read.csv("data/species_site_stage_metadata_BRT.csv")
+
+#define initial predictors
 predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope")
 
-for(z in 1:19){
+#setup parallel programming
+registerDoParallel(cores = 21)
+
+#loop to run through each species, stage, and site iteratively
+foreach(z = 1:21) %dopar% {
   try({
     
     #define parameters in loop
@@ -83,8 +91,9 @@ for(z in 1:19){
     #null tables for output
     gbm_hypers <- NULL
     gbm_boyce_final <- NULL
+    gbm_hyper_meta <- NULL
     
-    #loop starts here
+    #loop over each season
     for(i in seasons){
       this.test <- i
       
@@ -108,7 +117,7 @@ for(z in 1:19){
       predictors <- names(pred_check)
       
       
-      # 3. gbm Predictions - Tune parameters
+      # 3. BRT Predictions - Tune parameters
       
       #create parameter grid to vary hyperparameters
       param_grid <- expand.grid(interaction.depth = c(1, 3, 5),
@@ -157,7 +166,6 @@ for(z in 1:19){
       saveRDS(buff_gbm, 
               file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/buff_gbm_", this.test, ".RDS"))
       
-      
       #remove unnecessary parameters to continue
       rm(buff_gbm,buff_sel, X, Y, p1, p2)
       
@@ -194,7 +202,6 @@ for(z in 1:19){
       saveRDS(back_gbm, 
               file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/back_gbm_", this.test, ".RDS"))
       
-      
       #remove unnecessary parameters to continue
       rm(back_gbm,back_sel, X, Y, p1, p2)
       
@@ -215,7 +222,7 @@ for(z in 1:19){
       X <- crw_sel %>% select(-pa)
       Y <- as.factor(crw_sel$pa)
       crw_gbm <- train(x = X, y = Y, method = "gbm", metric = "ROC", trControl = cv_scheme, 
-                        tuneGrid = param_grid)
+                       tuneGrid = param_grid)
       
       #save parameter results
       crw_params <- crw_gbm$bestTune
@@ -231,28 +238,30 @@ for(z in 1:19){
       saveRDS(crw_gbm, 
               file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/crw_gbm_", this.test, ".RDS"))
       
-      
       #remove unnecessary parameters to continue
       rm(crw_gbm,crw_sel, X, Y, p1, p2)
       
       
       #FINAL DATA
+      #boyce scores
       gbm_boyce <- expand.grid(buff = buff_gbm_boyce, back = back_gbm_boyce, crw = crw_gbm_boyce)
       gbm_boyce$season <- i
       gbm_boyce_final <- rbind(gbm_boyce_final, gbm_boyce)
       
+      #hyperparameter tuning values
       hyper_values <- rbind(buff_params, back_params, crw_params)
       gbm_hyper_meta <- rbind(gbm_hyper_meta, hyper_values)
       
     }
     
     
-    # 4. Export Boyce, Mtry, and Metadata
+    # 4. Export Boyce and Hyperparameters
     saveRDS(gbm_boyce_final, 
             file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/boyce_scores_gbm.RDS"))
     saveRDS(gbm_hyper_meta, 
             file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/brt_hyperparameter_values.RDS"))
-
+    
+    #show species has finished
     print(paste0(this.species, " ", this.site, " ", this.stage, " success"))
     
   }) 
