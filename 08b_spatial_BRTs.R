@@ -1,6 +1,7 @@
 #automated script to run RFs for spatial transfer validation
 rm(list=ls())
 setwd("/mainfs/home/jcw2g17/Chapter 01/")
+#setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
 {
   library(dplyr)
@@ -20,11 +21,15 @@ meta2 <- read.csv("output/spatial/spatial_site_metadata.csv")
 #define initial predictors
 predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope")
 
+#isolate subsets where all predictors are present in test data - do the same for those missing chl and/or wind and change predictors
+meta <- meta[c(1, 3, 9, 10, 11, 13, 15:19),]
+meta2 <- meta2[c(4, 8, 9, 16:21, 25),]
+
 #setup parallel programming
 registerDoParallel(cores = 21)
 
 #loop to run through each species, stage, and site in parallel
-foreach(z=1:21) %dopar% {
+foreach(z=1:11) %dopar% {
   try({
     
     #define parameters in loop
@@ -41,10 +46,10 @@ foreach(z=1:21) %dopar% {
     crw <- read.csv(paste0("output/extraction/", this.species, "/", this.site, "/", this.stage, "/CRWs.csv"))
     
     #create presence/absence column
-    tracks$pa <- "presence"
-    buff$pa <- "absence"
-    back$pa <- "absence"
-    crw$pa <- "absence"
+    tracks$pa <- as.factor("presence")
+    buff$pa <- as.factor("absence")
+    back$pa <- as.factor("absence")
+    crw$pa <- as.factor("absence")
     
     #remove extra columns to allow rbind
     columns <- c("date", "depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope", "x", "y", "pa")
@@ -85,11 +90,14 @@ foreach(z=1:21) %dopar% {
       buff_sel <- buff_sel[colSums(is.na(buff_sel)) < 0.1*nrow(buff_sel)]
     }
     
+    #remove NAs
+    buff_sel <- buff_sel %>% na.omit()
+    
     #perform tuning search
     X <- buff_sel %>% select(-pa)
     Y <- as.factor(buff_sel$pa)
     buff_gbm <- train(x = X, y = Y, method = "gbm", metric = "ROC", trControl = cv_scheme, 
-                     tuneGrid = param_grid, num.trees = 1000, importance = "impurity")
+                     tuneGrid = param_grid)
     
     #save parameter results
     buff_params <- buff_gbm$bestTune
@@ -105,18 +113,21 @@ foreach(z=1:21) %dopar% {
     
     #BACKGROUND
     #remove non-predictor columns
-    back_sel <- back %>% select(all_of(predictors), pa)
+    back_sel <- back %>% select(all_of(predictors), pa) 
     
     #remove columns where missing data is over 10% of rows
     if(sum(is.na(back_sel)) > 0.1*nrow(back_sel)){
       back_sel <- back_sel[colSums(is.na(back_sel)) < 0.1*nrow(back_sel)]
     }
     
+    #remove NAs
+    back_sel <- back_sel %>% na.omit()
+    
     #perform tuning search
     X <- back_sel %>% select(-pa)
     Y <- as.factor(back_sel$pa)
     back_gbm <- train(x = X, y = Y, method = "gbm", metric = "ROC", trControl = cv_scheme, 
-                     tuneGrid = param_grid, num.trees = 1000, importance = "impurity")
+                     tuneGrid = param_grid)
     
     #save parameter results
     back_params <- back_gbm$bestTune
@@ -139,11 +150,14 @@ foreach(z=1:21) %dopar% {
       crw_sel <- crw_sel[colSums(is.na(crw_sel)) < 0.1*nrow(crw_sel)]
     }
     
+    #remove NAs
+    crw_sel <- crw_sel %>% na.omit()
+    
     #perform tuning search
     X <- crw_sel %>% select(-pa)
     Y <- as.factor(crw_sel$pa)
     crw_gbm <- train(x = X, y = Y, method = "gbm", metric = "ROC", trControl = cv_scheme, 
-                    tuneGrid = param_grid, num.trees = 1000, importance = "impurity")
+                    tuneGrid = param_grid)
     
     #save parameter results
     crw_params <- crw_gbm$bestTune
@@ -167,11 +181,11 @@ foreach(z=1:21) %dopar% {
     # 3. Test BRTs
     
     #filter spatial metadata to this species and stage
-    meta2 <- meta2 %>% filter(Species == this.species & Stage == this.stage)
+    meta3 <- meta2 %>% filter(Species == this.species & Stage == this.stage)
     
     #extract list of sites for this species and stage
-    meta2$Site <- as.factor(meta2$Site)
-    sites <- levels(meta2$Site)
+    meta3$Site <- as.factor(meta3$Site)
+    sites <- levels(meta3$Site)
     
     #null table for output
     gbm_boyce_final <- NULL
@@ -188,43 +202,19 @@ foreach(z=1:21) %dopar% {
       back_test <- back_test %>% select(all_of(predictors))
       tracks_test <- tracks_test %>% select(all_of(predictors))
       
-      #check for NA - less than 10% of training data okay for imputing
-      if(sum(is.na(back_test)) < 0.1*nrow(back_test) & sum(is.na(back_test)) > 0){
-        back_test_mice <- miceRanger(back_test, m=1)
-        back_test <- completeData(back_test_mice)[[1]]
-      }
-      
-      if(sum(is.na(tracks_test)) < 0.1*nrow(tracks_test) & sum(is.na(tracks_test)) > 0){
-        tracks_test_mice <- miceRanger(tracks_test, m=1)
-        tracks_test <- completeData(tracks_test_mice)[[1]]
-      }
-      
-      #remove columns where missing data is over 10% of rows then impute
-      if(sum(is.na(back_test)) > 0.1*nrow(back_test)){
-        back_test <- back_test[colSums(is.na(back_test)) < 0.1*nrow(back_test)]
-        back_test_mice <- miceRanger(back_test, m=1)
-        back_test <- completeData(back_test_mice)[[1]]
-      }
-      
-      if(sum(is.na(tracks_test)) > 0.1*nrow(tracks_test)){
-        tracks_test <- tracks_test[colSums(is.na(tracks_test)) < 0.1*nrow(tracks_test)]
-        tracks_test_mice <- miceRanger(tracks_test, m=1)
-        tracks_test <- completeData(tracks_test_mice)[[1]]
-      }
-      
       #predict and evaluate buffers
-      p1 <- predict(buff_gbm, tracks_test, type = "prob")[,2]
-      p2 <- predict(buff_gbm, back_test, type = "prob")[,2]
+      p1 <- predict(buff_gbm, tracks_test, type = "prob")[,1]
+      p2 <- predict(buff_gbm, back_test, type = "prob")[,1]
       buff_gbm_boyce <- evalContBoyce(p1, p2)
       
       #predict and evaluate background
-      p1 <- predict(back_gbm, tracks_test, type = "prob")[,2]
-      p2 <- predict(back_gbm, back_test, type = "prob")[,2]
+      p1 <- predict(back_gbm, tracks_test, type = "prob")[,1]
+      p2 <- predict(back_gbm, back_test, type = "prob")[,1]
       back_gbm_boyce <- evalContBoyce(p1, p2)
       
       #predict and evaluate crws
-      p1 <- predict(crw_gbm, tracks_test, type = "prob")[,2]
-      p2 <- predict(crw_gbm, back_test, type = "prob")[,2]
+      p1 <- predict(crw_gbm, tracks_test, type = "prob")[,1]
+      p2 <- predict(crw_gbm, back_test, type = "prob")[,1]
       crw_gbm_boyce <- evalContBoyce(p1, p2)
       
       #FINAL DATA

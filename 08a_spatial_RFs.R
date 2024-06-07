@@ -1,6 +1,7 @@
 #automated script to run RFs for spatial transfer validation
 rm(list=ls())
-setwd("/mainfs/home/jcw2g17/Chapter 01/")
+#setwd("/mainfs/home/jcw2g17/Chapter 01/")
+setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
 {
   library(dplyr)
@@ -18,8 +19,12 @@ meta2 <- read.csv("output/spatial/spatial_site_metadata.csv")
 #define initial predictors
 predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope")
 
+#isolate subsets where all predictors are present in test data - do the same for those missing chl and/or wind and change predictors
+meta <- meta[c(1, 3, 9, 10, 11, 13, 15:19),]
+meta2 <- meta2[c(4, 8, 9, 16:21, 25),]
+
 #loop to run through each species, stage, and site iteratively
-for(z in 1:21) {
+for(z in 1:11) {
   try({
     
     #define parameters in loop
@@ -183,11 +188,11 @@ for(z in 1:21) {
     # 3. Test RFs
     
     #filter spatial metadata to this species and stage
-    meta2 <- meta2 %>% filter(Species == this.species & Stage == this.stage)
+    meta3 <- meta2 %>% filter(Species == this.species & Stage == this.stage)
     
     #extract list of sites for this species and stage
-    meta2$Site <- as.factor(meta2$Site)
-    sites <- levels(meta2$Site)
+    meta3$Site <- as.factor(meta3$Site)
+    sites <- levels(meta3$Site)
     
     #null table for output
     rf_boyce_final <- NULL
@@ -211,19 +216,6 @@ for(z in 1:21) {
       }
 
       if(sum(is.na(tracks_test)) < 0.1*nrow(tracks_test) & sum(is.na(tracks_test)) > 0){
-        tracks_test_mice <- miceRanger(tracks_test, m=1)
-        tracks_test <- completeData(tracks_test_mice)[[1]]
-      }
-      
-      #remove columns where missing data is over 10% of rows then impute
-      if(sum(is.na(back_test)) > 0.1*nrow(back_test)){
-        back_test <- back_test[colSums(is.na(back_test)) < 0.1*nrow(back_test)]
-        back_test_mice <- miceRanger(back_test, m=1)
-        back_test <- completeData(back_test_mice)[[1]]
-      }
-
-      if(sum(is.na(tracks_test)) > 0.1*nrow(tracks_test)){
-        tracks_test <- tracks_test[colSums(is.na(tracks_test)) < 0.1*nrow(tracks_test)]
         tracks_test_mice <- miceRanger(tracks_test, m=1)
         tracks_test <- completeData(tracks_test_mice)[[1]]
       }

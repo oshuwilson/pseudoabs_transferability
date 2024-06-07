@@ -1,4 +1,7 @@
 #calculate extrapolation for each temporal test
+#SOES Marion post-moult incomplete. Need to do SOES WAP and SG ones too.
+#SUFS Marion post-moult buffers has many NAs
+
 rm(list=ls())
 setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
@@ -13,6 +16,7 @@ meta <- read.csv("data/species_site_stage_metadata.csv")
 
 #define initial predictors
 predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope")
+meta <- meta[-c(1:19),]
 
 #loop over every species, site, and stage
 for(z in 1:21){
@@ -79,6 +83,7 @@ for(z in 1:21){
   
   #create empty table
   shape_values <- NULL
+  shape_all <- NULL
   
   #loop over each season
   for(i in seasons){
@@ -98,11 +103,57 @@ for(z in 1:21){
       back_test <- back_test %>% select(-sic)
     }
     
-    #calculate shape
-    buff_shape <- extra_eval(training_data = buff_train, pr_ab = "pa", projection_data = back_test, n_cores = 6)
-    back_shape <- extra_eval(training_data = back_train, pr_ab = "pa", projection_data = back_test, n_cores = 6)
-    crw_shape <- extra_eval(training_data = crw_train, pr_ab = "pa", projection_data = back_test, n_cores = 6)
+    #if test data is missing over 10% of a predictor, remove predictor
+    pred_check <- back_test
+    if(sum(is.na(pred_check)) > 0.1*nrow(pred_check)){
+      pred_check <- pred_check[colSums(is.na(pred_check)) < 0.1*nrow(pred_check)]
+    }
+    predictors2 <- names(pred_check)
     
+    #BUFFERS
+    #remove predictors if over 10% of column is NA
+    pred_check <- buff_train %>% select(all_of(predictors2))
+    if(sum(is.na(pred_check)) > 0.1*nrow(pred_check)){
+      pred_check <- pred_check[colSums(is.na(pred_check)) < 0.1*nrow(pred_check)]
+    }
+    buff_predictors <- names(pred_check)
+    
+    #make testing data the same columns
+    buff_testing <- back_test %>% select(all_of(buff_predictors))
+    
+    #calculate shape
+    buff_shape <- extra_eval(training_data = buff_train, pr_ab = "pa", projection_data = buff_testing, n_cores = 6)
+    
+    
+    #BACKGROUND
+    #remove predictors if over 10% of column is NA
+    pred_check <- back_train %>% select(all_of(predictors2))
+    if(sum(is.na(pred_check)) > 0.1*nrow(pred_check)){
+      pred_check <- pred_check[colSums(is.na(pred_check)) < 0.1*nrow(pred_check)]
+    }
+    back_predictors <- names(pred_check)
+    
+    #make testing data the same columns
+    back_testing <- back_test %>% select(all_of(back_predictors))
+    
+    #calculate shape
+    back_shape <- extra_eval(training_data = back_train, pr_ab = "pa", projection_data = back_testing, n_cores = 6)
+    
+    
+    #CRW
+    #remove predictors if over 10% of column is NA
+    pred_check <- crw_train %>% select(all_of(predictors2))
+    if(sum(is.na(pred_check)) > 0.1*nrow(pred_check)){
+      pred_check <- pred_check[colSums(is.na(pred_check)) < 0.1*nrow(pred_check)]
+    }
+    crw_predictors <- names(pred_check)
+    
+    #make testing data the same columns
+    crw_testing <- back_test %>% select(all_of(crw_predictors))
+    
+    #calculate shape
+    crw_shape <- extra_eval(training_data = crw_train, pr_ab = "pa", projection_data = crw_testing, n_cores = 6)
+
     #store scores
     shape_scores <- cbind(buff_shape[,1], back_shape[,1], crw_shape[,1])
     names(shape_scores) <- c("buff", "back", "crw")
@@ -121,11 +172,16 @@ for(z in 1:21){
     #bind to dataset with information for every season
     shape_values <- rbind(shape_values, shape_IQR)
     
+    shape_scores$season <- this.test
+    shape_all <- rbind(shape_all, shape_scores)
+    
   }
   
   #export dataset
   saveRDS(shape_values,
-          file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/shape_values.RDS"))
+          file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/shape_medians.RDS"))
+  saveRDS(shape_all,
+          file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/shape_scores.RDS"))
   
   #print to show that this species has completed
   print(paste0(this.species, " ", this.site, " ", this.stage, " completed"))

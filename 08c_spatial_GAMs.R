@@ -1,14 +1,15 @@
 #automated script to run GAMs for spatial transfer validation
 rm(list=ls())
-setwd("/mainfs/home/jcw2g17/Chapter 01/")
+#setwd("/mainfs/home/jcw2g17/Chapter 01/")
+setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
 {
   library(dplyr)
   library(mgcv)
   library(enmSdmX)
   library(lubridate)
-  library(foreach)
-  library(doParallel)
+  #library(foreach)
+  #library(doParallel)
 }
 
 #GAM function to only use predictors that remain after later steps remove some
@@ -24,17 +25,22 @@ pred_gam <- function(df){
 }
 
 #read in table with info for each species, site and stage
-meta <- read.csv("data/species_site_stage_metadata_GAMs.csv")
+meta <- read.csv("data/species_site_stage_metadata.csv")
 meta2 <- read.csv("output/spatial/spatial_site_metadata.csv")
+meta2 <- meta2 %>% rename(Species = X...Species)
 
-#define initial predictors
-predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope")
+#isolate subsets where all predictors are present in test data - do the same for those missing chl and/or wind and change predictors
+meta <- meta[c(1, 3, 9, 10, 11, 13, 15:19),]
+meta2 <- meta2[c(4, 8, 9, 16:21, 25),]
+
+#define initial predictors - remove chl and/or wind where relevant
+predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope") 
 
 #setup parallel programming
-registerDoParallel(cores = 21)
+#registerDoParallel(cores = 21)
 
 #loop to run through each species, stage, and site in parallel
-foreach(z=1:21) %dopar% {
+for(z in 1:11) {
   try({
     
     #define parameters in loop
@@ -155,11 +161,11 @@ foreach(z=1:21) %dopar% {
     # 3. Test GAMs
     
     #filter spatial metadata to this species and stage
-    meta2 <- meta2 %>% filter(Species == this.species & Stage == this.stage)
+    meta3 <- meta2 %>% filter(Species == this.species & Stage == this.stage)
     
     #extract list of sites for this species and stage
-    meta2$Site <- as.factor(meta2$Site)
-    sites <- levels(meta2$Site)
+    meta3$Site <- as.factor(meta3$Site)
+    sites <- levels(meta3$Site)
     
     #null table for loop
     gam_boyce_final <- NULL
@@ -197,6 +203,8 @@ foreach(z=1:21) %dopar% {
     #export boyce scores
     saveRDS(gam_boyce_final, 
             file = paste0("output/spatial/", this.species, "/", this.site, "/", this.stage, "/boyce_scores_gam.RDS"))
+    
+    print(paste0(this.species, " ", this.stage, " ", this.site, " completed"))
     
   })
   
