@@ -16,15 +16,27 @@ setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 meta <- read.csv("data/species_site_stage_metadata.csv")
 meta2 <- read.csv("output/spatial/spatial_site_metadata.csv")
 
+#isolate subsets where all predictors are present in test data - change for those missing >10% of chl and/or wind
+meta2 <- meta2 %>% filter(Missing == "") #possible options "", "chl", or "windchl"
+meta <- meta %>% filter(Species %in% meta2$Species & Stage %in% meta2$Stage)
+
 #define initial predictors
 predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope")
 
-#isolate subsets where all predictors are present in test data - do the same for those missing chl and/or wind and change predictors
-meta <- meta[c(1, 3, 9, 10, 11, 13, 15:19),]
-meta2 <- meta2[c(4, 8, 9, 16:21, 25),]
+#remove predictors if missing
+missing <- meta2$Missing[1]
+
+if(missing == "chl"){
+  predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "wind", "eke", "slope")
+}
+
+if(missing == "windchl"){
+  predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "slope")
+}
+
 
 #loop to run through each species, stage, and site iteratively
-for(z in 1:11) {
+for(z in 1:nrow(meta)) {
   try({
     
     #define parameters in loop

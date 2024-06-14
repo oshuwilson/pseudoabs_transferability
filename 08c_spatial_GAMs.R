@@ -27,20 +27,30 @@ pred_gam <- function(df){
 #read in table with info for each species, site and stage
 meta <- read.csv("data/species_site_stage_metadata.csv")
 meta2 <- read.csv("output/spatial/spatial_site_metadata.csv")
-meta2 <- meta2 %>% rename(Species = X...Species)
 
-#isolate subsets where all predictors are present in test data - do the same for those missing chl and/or wind and change predictors
-meta <- meta[c(1, 3, 9, 10, 11, 13, 15:19),]
-meta2 <- meta2[c(4, 8, 9, 16:21, 25),]
+#isolate subsets where all predictors are present in test data - change for those missing >10% of chl and/or wind
+meta2 <- meta2 %>% filter(Missing == "") #possible options "", "chl", or "windchl"
+meta <- meta %>% filter(Species %in% meta2$Species & Stage %in% meta2$Stage)
 
-#define initial predictors - remove chl and/or wind where relevant
-predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope") 
+#define initial predictors
+predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope")
+
+#remove predictors if missing
+missing <- meta2$Missing[1]
+
+if(missing == "chl"){
+  predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "wind", "eke", "slope")
+}
+
+if(missing == "windchl"){
+  predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "slope")
+}
 
 #setup parallel programming
 #registerDoParallel(cores = 21)
 
-#loop to run through each species, stage, and site in parallel
-for(z in 1:11) {
+#loop to run through each species, stage, and site
+for(z in 1:nrow(meta)) { #change to foreach to run in parallel
   try({
     
     #define parameters in loop

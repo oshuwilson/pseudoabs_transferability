@@ -252,7 +252,7 @@ foreach(z = 1:21) %dopar% {
     }
     
     
-    # 4. Export Boyce and Hyperparameters
+    # 4. Export Boyce Scores and Hyperparameters
     saveRDS(gbm_boyce_final, 
             file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/boyce_scores_gbm.RDS"))
     saveRDS(gbm_hyper_meta, 

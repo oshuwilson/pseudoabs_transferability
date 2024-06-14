@@ -278,7 +278,7 @@ for(z in 1:19){
     }
     
     
-    # 4. Export Boyce, Mtry, and Metadata
+    # 4. Export Boyce Scores, Mtry, and Metadata
     saveRDS(rf_boyce_final, 
             file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/boyce_scores_rf.RDS"))
     saveRDS(rf_mtry_meta, 

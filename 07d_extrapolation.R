@@ -1,9 +1,9 @@
 #calculate extrapolation for each temporal test
 #SOES Marion post-moult incomplete. Need to do SOES WAP and SG ones too.
-#SUFS Marion post-moult buffers has many NAs
 
 rm(list=ls())
-setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
+#setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
+setwd("/mainfs/home/jcw2g17/Chapter 01/")
 
 {
   library(lubridate)
@@ -16,7 +16,7 @@ meta <- read.csv("data/species_site_stage_metadata.csv")
 
 #define initial predictors
 predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope")
-meta <- meta[-c(1:19),]
+meta <- meta[-c(1:15, 20:21),]
 
 #loop over every species, site, and stage
 for(z in 1:21){
@@ -122,7 +122,7 @@ for(z in 1:21){
     buff_testing <- back_test %>% select(all_of(buff_predictors))
     
     #calculate shape
-    buff_shape <- extra_eval(training_data = buff_train, pr_ab = "pa", projection_data = buff_testing, n_cores = 6)
+    buff_shape <- extra_eval(training_data = buff_train, pr_ab = "pa", projection_data = buff_testing, n_cores = 40)
     
     
     #BACKGROUND
@@ -137,7 +137,7 @@ for(z in 1:21){
     back_testing <- back_test %>% select(all_of(back_predictors))
     
     #calculate shape
-    back_shape <- extra_eval(training_data = back_train, pr_ab = "pa", projection_data = back_testing, n_cores = 6)
+    back_shape <- extra_eval(training_data = back_train, pr_ab = "pa", projection_data = back_testing, n_cores = 40)
     
     
     #CRW
@@ -152,7 +152,7 @@ for(z in 1:21){
     crw_testing <- back_test %>% select(all_of(crw_predictors))
     
     #calculate shape
-    crw_shape <- extra_eval(training_data = crw_train, pr_ab = "pa", projection_data = crw_testing, n_cores = 6)
+    crw_shape <- extra_eval(training_data = crw_train, pr_ab = "pa", projection_data = crw_testing, n_cores = 40)
 
     #store scores
     shape_scores <- cbind(buff_shape[,1], back_shape[,1], crw_shape[,1])
@@ -172,6 +172,7 @@ for(z in 1:21){
     #bind to dataset with information for every season
     shape_values <- rbind(shape_values, shape_IQR)
     
+    #do the same for scores of entire dataset
     shape_scores$season <- this.test
     shape_all <- rbind(shape_all, shape_scores)
     

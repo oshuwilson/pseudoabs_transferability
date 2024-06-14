@@ -20,10 +20,9 @@ predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "e
 meta <- meta %>% filter(Species != "ANPE" & Species != "EMPE" & Species != "SUFS")
 meta <- meta %>% filter(Species != "MAPE" | 
                           (Species == "MAPE" & Stage != "incubation" & Stage != "post-breeding"))
-meta <- meta[-c(1:2),] #remove already completed stages
 
 #loop over every species, site, and stage
-for(z in 1:14){
+for(z in 1:nrow(meta)){
   
   #define parameters in loop
   rm(list=setdiff(ls(), c("meta", "predictors", "z", "meta2")))
@@ -90,7 +89,7 @@ for(z in 1:14){
     }
     
     if(meta4$Missing[1] == "chl"){
-      shape_predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "chl", "eke", "slope")
+      shape_predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "wind", "eke", "slope")
     }
     
     if(meta4$Missing[1] == ""){
@@ -101,8 +100,6 @@ for(z in 1:14){
     if(sum(back_test$sic) == 0 & sum(back$sic == 0)){
       shape_predictors <- shape_predictors[shape_predictors != "sic"]
     }
-    
-    #SIC???
     
     #only select predictors for training and testing
     back_test <- back_test %>% select(all_of(shape_predictors))
