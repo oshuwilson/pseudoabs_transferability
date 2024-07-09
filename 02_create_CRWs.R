@@ -1,9 +1,10 @@
 #create Correlated Random Walk simulations from tracks
-#REDO WAP POST-MOULT SOES - didn't remove error or resample from original
 
+#clear workspace and set working directory
 rm(list=ls())
 setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
+#load required packages
 {
   library(aniMotum)
   library(dplyr)
@@ -14,31 +15,33 @@ setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 }
 
 
-#refresh from here
+#refresh from here for each new breeding stage
 rm(list=ls())
 
 #read in species/site/stage
-this.species <- "SOES"
-this.site <- "WAP"
-this.stage <- "post-moult"
-CPF <- FALSE #central place forager? default TRUE except for HUWH
-timestep <- 2 #timestep of state-space-modeled tracks for this species (in hours)
+this.species <- "ADPE"
+this.site <- "Pointe_Geologie"
+this.stage <- "chick-rearing"
+CPF <- TRUE #central place forager? TRUE for majority of tracks except for in HUWH and SOES post-moult
 
 
 # 1. Read in and format tracking data for aniMotum
-tracks <- read.csv(paste0("data/tracks_by_stage/", this.species, "/", this.site, "/", this.stage, "_at_sea.csv"))
+tracks <- read.csv(paste0("data/tracks_by_stage/", this.species, "/", this.site, "/", this.stage, ".csv"))
 tracks$date <- as.POSIXct(tracks$date, format = "%Y-%m-%d %H:%M:%S")
 tracks$individual_id <- as.factor(tracks$individual_id)
+tracks <- tracks %>% select(individual_id, date, x, y, longitude_se, latitude_se)
+
+#extract timestep from state-spaced modeled tracks (in hours)
+timestep <- as.numeric(tracks[2,]$date - tracks[1,]$date)
 
 #create lc column to tell aniMotum that errors are included
 tracks$lc <- "GL"
 
 #rename and select columns for aniMotum model fitting
 tracks <- tracks %>% rename(id = individual_id, lon = x, lat = y, x.sd = longitude_se, y.sd = latitude_se)
-tracks <- tracks %>% select(id, date, lc, lon, lat, x.sd, y.sd)
 
 
-#2. Split each ID into trips - only for CPFs
+#2. Split each ID into trips - unenecessary for HUWH
 tracks_by_ID <- tracks %>% group_by(id) %>%  #group_by_ID
   mutate(date0 = lag(date)) %>% #create column for date at point t-1
   mutate(timegap = interval(date0, date)/hours(1)) %>% #create column for the diff between t and t-1
@@ -47,7 +50,6 @@ tracks_by_ID <- tracks %>% group_by(id) %>%  #group_by_ID
   mutate(trip_ID = as.factor(paste(id, trip, sep="_"))) #create trip ID columns
 
 #identify trips too short for aniMotum (n<10)
-#these trips are typically ice-resting anyway
 trip_lengths <- tracks_by_ID %>% group_by(trip_ID) %>% #group by ID and trip
   summarise(n=n()) %>% #count row numbers for each trip
   filter(n < 10) #isolate short trips
@@ -64,6 +66,7 @@ tracks_by_ID <- tracks_by_ID %>% ungroup() %>%
   select(trip_ID, date, lc, lon, lat, x.sd, y.sd) %>%
   rename(id = trip_ID)
 
+#replace tracks dataset with tracks_by_ID
 tracks <- tracks_by_ID
 
 
@@ -80,7 +83,7 @@ fit <- fit_ssm(tracks, model="crw", control=ssm_control(verbose=0), spdf = FALSE
 
 #simulate 10 tracks per trip
 st <- sim_fit(fit, what="fitted", rep=10, cpf=CPF)
-plot(st[1,]) #visualise
+plot(st[1,])
 
 #keep the most representative track
 #uses bearing and distance travelled as in Hazen et al. 2017 
@@ -95,15 +98,13 @@ plot(st_routed[1,])
 
 
 # 4. ID erroneous tracks (5 at a time)
-#these can be unrealistic (e.g. circumpolar) or not CPFs among CPF data
+#these can be unrealistic (e.g. circumpolar), where track ends before returning to colony, or condensed around coastlines
 plot(st_routed[1:5, ])
 
 #record error tracks
-resample <- c(6, 15, 22:24, 26, 28, 37:38, 40, 44, 48:49, 51, 64, 66, 70, 75, 77:78, 87, 89, 91, 96:97,
-              104, 106, 115, 117, 119, 127, 147, 163, 167, 172, 177, 179,
-              206, 209, 213, 217, 222, 225, 227:229, 234:235, 238:239, 242, 253, 256, 267) #unrealistic CRW distances or compressed around coast
-nonCPF <- c(13, 27, 29, 122, 124, 126, 200) #tracks that terminate without returning to/near the colony
-discard <- c(45:47, 53:54, 108, 131:132, 148, 152:156, 173, 186:189, 240:241, 254) #tracks that appear to be resting on ice with little movement
+resample <- c(1, 3, 15) #unrealistic CRW distances or compressed around coast
+nonCPF <- c(21, 43) #tracks that terminate without returning to/near the colony
+discard <- c(22) #tracks that appear to be resting with little movement
 
 
 # 5. Remove erroneous tracks 
@@ -113,67 +114,69 @@ errors <- filter(st_routed, row_number() %in% error)
 errors$id <- as.factor(errors$id)
 error_IDs <- levels(errors$id)
 
-#filter out error IDs
+#remove error IDs to keep good CRWs
 st_pure <- st_routed %>% filter(!id %in% error_IDs)
 
 
-# 6. Resample CPF CRWs
+# 6. Resample CRWs
+#extract IDs to be resampled
 resamples <- filter(st_routed, row_number() %in% resample)
 resamples$id <- as.factor(resamples$id)
 resample_IDs <- levels(resamples$id)
 
-#isolate error trips 
+#isolate resampling trips 
 resample_tracks <- tracks %>% filter(id %in% resample_IDs)
 
 #rerun CRWs
 resample_fit <- fit_ssm(resample_tracks, model="crw", control=ssm_control(verbose=0), spdf = FALSE)
-
 resample_st <- sim_fit(resample_fit, what="fitted", rep=10, cpf=CPF) 
 plot(resample_st[1,])
 
 #can filter by lat/lon sd if prone to unrealistic distances
 resample_st_filter <- sim_filter(resample_st, keep=0.1, var=c("lat"), FUN = "sd")
-plot(resample_st_filter[1:5,])
+plot(resample_st_filter[1,])
 
+#reroute around land
 resample_st_routed <- route_path(resample_st_filter)
-plot(resample_st_routed[51:54,])
+plot(resample_st_routed[1,])
 
 #check all refit CRWs have been fixed
-plot(resample_st_routed[29:30,])
-
+plot(resample_st_routed[1,])
 
 #if yes, proceed
 st_resampled <- resample_st_routed
 
+
 # 7. Resample Non-CPF CRWs
+#extract IDs to be resampled
 nonCPFs <- filter(st_routed, row_number() %in% nonCPF)
 nonCPFs$id <- as.factor(nonCPFs$id)
 nonCPF_IDs <- levels(nonCPFs$id)
 
-#isolate error trips 
+#isolate resampling trips 
 nonCPF_tracks <- tracks %>% filter(id %in% nonCPF_IDs)
 
 #rerun CRWs
 nonCPF_fit <- fit_ssm(nonCPF_tracks, model="crw", control=ssm_control(verbose=0), spdf = FALSE)
-
 nonCPF_st <- sim_fit(nonCPF_fit, what="fitted", rep=20, cpf=FALSE)
 plot(nonCPF_st[1,])
 
 #can filter by lat/lon sd if prone to unrealistic distances
 nonCPF_st_filter <- sim_filter(nonCPF_st, keep = 0.5, var="lat", FUN="min")
 nonCPF_st_filter <- sim_filter(nonCPF_st_filter, keep=0.1, var=c("lat", "lon"), FUN="sd")
-plot(nonCPF_st_filter[5:7,])
+plot(nonCPF_st_filter[1,])
 
+#reroute around land
 nonCPF_st_routed <- route_path(nonCPF_st_filter)
-plot(nonCPF_st_routed[5:7,])
+plot(nonCPF_st_routed[1,])
 
 #check all refit CRWs have been fixed
-plot(nonCPF_st_routed[32,])
+plot(nonCPF_st_routed[1,])
 
 #if yes, proceed
 st_nonCPF <- nonCPF_st_routed
 
-#combine all good tracks
+#combine all good and resampled tracks
 fixed_st <- rbind(st_pure, st_resampled, st_nonCPF)
 
 
@@ -188,13 +191,9 @@ CRW_terra <- vect(CRW,
                   geom = c("lon", "lat"),
                   crs = "epsg:4326")
 CRW_terra <- project(CRW_terra, "EPSG:6932")
-
 plot(CRW_terra, col="red", pch=".")
 plot(tracks_terra, add=T, pch=".", col="black")
 
 # 9. Format and Export
 CRW <- CRW %>% rename(x=lon, y=lat)
-tracks <- tracks %>% select(id, date, lon, lat) %>% rename(x=lon, y=lat)
-
 write.csv(CRW, paste0("output/CRWs/", this.species, "/", this.site, "/", this.stage, ".csv"))
-write.csv(tracks, paste0("output/CRWs/", this.species, "/", this.site, "/", this.stage, "_presences.csv"))

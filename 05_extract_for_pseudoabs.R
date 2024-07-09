@@ -1,7 +1,10 @@
-#script for extracting environmental variables to pseudoabsences
+#script for extracting environmental covariates to pseudo-absences
+
+#clear workspace and set working directory
 rm(list=ls())
 setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
+#load required packages
 {
   library(terra)
   library(dplyr)
@@ -11,20 +14,20 @@ setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
 #setup
 rm(list=ls())
-this.species <- "SOES"
-this.site <- "WAP"
-this.stage <- "post-moult"
+this.species <- "ADPE"
+this.site <- "Pointe_Geologie"
+this.stage <- "chick-rearing"
 pseudo.type <- "background" #either background, buffers, or CRWs
 
-#read in pseudo
+#read in pseudo - for background run for each test year too
 pseudo <- read.csv(paste0("output/", pseudo.type, "/", this.species, "/", this.site, "/", this.stage, ".csv"))
 
 #only keep relevant columns
-pseudo <- pseudo %>% select(-X)
+pseudo <- pseudo %>% select(date, x, y)
 
 #format date (for temporal extraction later)
 pseudo$date <- as_datetime(pseudo$date)
-min_date <- min(pseudo$date) #important for wind and chlorophyll - check dates if before 2000
+min_date <- min(pseudo$date) #important for wind and chlorophyll later on
 
 #---------------
 #Static Variables
@@ -60,8 +63,8 @@ rm(depth, slope, dshelf)
 #---------------
 #Dynamic Variables
 
-#dynamic_extract function from 05a script
-source("code/05a_dynamic_extract_function.R")
+#load functions for dynamic extraction
+source("code/extraction_functions.R")
 
 ###SST###
 pseudo <- dynamic_extract(predictor = "sst", pseudo)
@@ -89,20 +92,23 @@ pseudo$eke <- 0.5 * ((pseudo$uo^2) + (pseudo$vo^2))
 
 ###CHL### 
 #Satellite data unavailable before 04-09-1997 and needs adjusted function for other dates in 1997
+
+#cutoff dates for tracks from before chl data available and in 1997 needing unique function
 cutoff_97 <- as_date("1997-09-04")
 cutoff_98 <- as_date("1998-01-01")
 
+#if tracks predate 1998, split into 3 objects for extraction
 if(min_date < cutoff_98){
 pseudo_pre97 <- pseudo %>% filter(date < cutoff_97)
 pseudo_97 <- pseudo %>% filter(date >= cutoff_97 & date < cutoff_98)
 pseudo <- pseudo %>% filter(date >= cutoff_98)
 }
 
-source("code/05b_dynamic_chlorophyll_function.R") #unique function for different file structure
+#extract data post-1997
 pseudo <- dynamic_chlorophyll(predictor = "chl", pseudo)
 
+#extract data in 1997 and rejoin data together
 if(min_date < cutoff_98){
-source("code/05d_dynamic_chlorophyll_1997_function.R")
 try(pseudo_97 <- dynamic_chlorophyll_1997(predictor="chl", pseudo_97))
 
 pseudo <- bind_spat_rows(pseudo, pseudo_97, pseudo_pre97)
@@ -113,23 +119,25 @@ rm(cutoff_97, cutoff_98, pseudo_pre97, pseudo_97)
 ###WIND###
 #Satellite data unavailable before 01-08-1999 and needs adjusted function for other dates in 1999
 
+#cutoff dates for tracks from before wind data available and in 1999 needing unique function
 cutoff_99 <- as_date("1999-08-01")
 cutoff_00 <- as_date("2000-01-01")
 
+#if tracks predate 2000, split into 3 objects for extraction
 if(min_date < cutoff_00){
 pseudo_pre99 <- pseudo %>% filter(date < cutoff_99)
 pseudo_99 <- pseudo %>% filter(date >= cutoff_99 & date < cutoff_00)
 pseudo <- pseudo %>% filter(date >= cutoff_00)
 }
 
-source("code/05c_dynamic_wind_function.R")
+#extract data post-1999
 pseudo <- dynamic_wind(predictor = "wind", pseudo, direction = "east")
 pseudo <- dynamic_wind(predictor = "wind", pseudo, direction = "north")
 pseudo$wind <- sqrt(pseudo$wind_east^2 + pseudo$wind_north^2)
 ggplot(pseudo, aes(x=wind)) + geom_density()
 
+#extract data in 1999 and rejoin data together
 if(min_date < cutoff_00){
-source("code/05e_dynamic_wind_1999_function.R")
 try(pseudo_99 <- dynamic_wind_1999(predictor="wind", pseudo_99, direction = "east"))
 try(pseudo_99 <- dynamic_wind_1999(predictor="wind", pseudo_99, direction = "north"))
 pseudo_99$wind <- sqrt(pseudo_99$wind_east^2 + pseudo_99$wind_north^2)
@@ -140,10 +148,12 @@ rm(cutoff_99, cutoff_00, pseudo_pre99, pseudo_99)
 }
 
 #---------------
-#Export
+# Exporting
+#convert to dataframe
 plot(pseudo, pch=".")
 pseudo <- as.data.frame(pseudo, geom="XY")
 
+#export
 write.csv(pseudo, 
           file=paste0("output/extraction/", this.species, "/", this.site, "/", this.stage, "/", pseudo.type, ".csv"))
 

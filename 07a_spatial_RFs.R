@@ -1,8 +1,11 @@
 #automated script to run RFs for spatial transfer validation
+
+#clear workspace and set working directory
 rm(list=ls())
 #setwd("/mainfs/home/jcw2g17/Chapter 01/")
 setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
+#load required packages
 {
   library(dplyr)
   library(caret)

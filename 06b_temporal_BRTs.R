@@ -1,7 +1,10 @@
 #automated script to run Boosted Regression Trees for leave-year-out validation
+
+#clear workspace and set working directory
 rm(list=ls())
 setwd("/mainfs/home/jcw2g17/Chapter 01/")
 
+#load required packages
 {
   library(dplyr)
   library(caret)
@@ -94,11 +97,23 @@ foreach(z = 1:21) %dopar% {
     for(i in seasons){
       this.test <- i
       
-      #extract training data
+      #extract training data - background uses separate file for each season
       buff_train <- buff %>% filter(season != this.test)
-      back_train <- back %>% filter(season != this.test)
       crw_train <- crw %>% filter(season != this.test)
       tracks_train <- tracks %>% filter(season != this.test)
+      back_train <- read.csv(paste0("output/extraction/", this.species, "/", this.site, "/", this.stage, "/background_", this.test, ".csv"))
+      
+      #format background training data with all previous steps
+      back_train$pa <- 0
+      back_train <- back_train %>% select(all_of(columns))
+      back_train$date <- as_date(back_train$date)
+      if(season == FALSE){
+        back_train$season <- year(back_train$date)
+      }
+      if(season == TRUE){
+        back_train$season <- year(round_date(back_train$date, unit="year"))
+      }
+      back_train <- rbind(tracks_train, back_train)
       
       #extract testing data
       back_test <- back %>% filter(season == this.test, pa == 0)

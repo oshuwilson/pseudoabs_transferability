@@ -1,17 +1,30 @@
-#automated script to run RFs for spatial transfer validation
-rm(list=ls())
-setwd("/mainfs/home/jcw2g17/Chapter 01/")
-#setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
+#automated script to run GAMs for spatial transfer validation
 
+#clear workspace and set working directory
+rm(list=ls())
+#setwd("/mainfs/home/jcw2g17/Chapter 01/")
+setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
+
+#load required packages
 {
   library(dplyr)
-  library(caret)
-  library(gbm)
+  library(mgcv)
   library(enmSdmX)
   library(lubridate)
-  library(foreach)
-  library(doParallel)
-  library(miceRanger)
+  #library(foreach)
+  #library(doParallel)
+}
+
+#GAM function to only use predictors that remain after later steps remove some
+pred_gam <- function(df){
+  mgcv::gam(
+    as.formula(
+      paste0(
+        "pa ~ s(", 
+        setdiff(names(df), "pa") %>% paste0(collapse = ", bs = 'ts', k=5) + s("),
+        ", bs = 'ts', k=5)"
+      )), 
+    family=binomial, data=df)
 }
 
 #read in table with info for each species, site and stage
@@ -37,18 +50,18 @@ if(missing == "windchl"){
 }
 
 #setup parallel programming
-registerDoParallel(cores = 21)
+#registerDoParallel(cores = 21)
 
-#loop to run through each species, stage, and site in parallel
-foreach(z=1:nrow(meta)) %dopar% {
+#loop to run through each species, stage, and site
+for(z in 1:nrow(meta)) { #change to foreach to run in parallel
   try({
     
     #define parameters in loop
-    rm(list=setdiff(ls(), c("meta", "meta2", "predictors", "z")))
+    rm(list=setdiff(ls(), c("meta", "meta2", "predictors", "z", "pred_gam")))
     this.species <- meta[z, 1]
     this.site <- meta[z, 2]
     this.stage <- meta[z, 3]
-    
+
     # 1. Formatting 
     #read in presences and pseudo-absences
     tracks <- read.csv(paste0("output/extraction/", this.species, "/", this.site, "/", this.stage, "/presences.csv"))
@@ -57,10 +70,10 @@ foreach(z=1:nrow(meta)) %dopar% {
     crw <- read.csv(paste0("output/extraction/", this.species, "/", this.site, "/", this.stage, "/CRWs.csv"))
     
     #create presence/absence column
-    tracks$pa <- as.factor("presence")
-    buff$pa <- as.factor("absence")
-    back$pa <- as.factor("absence")
-    crw$pa <- as.factor("absence")
+    tracks$pa <- 1
+    buff$pa <- 0
+    back$pa <- 0
+    crw$pa <- 0
     
     #remove extra columns to allow rbind
     columns <- c("date", "depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope", "x", "y", "pa")
@@ -80,116 +93,85 @@ foreach(z=1:nrow(meta)) %dopar% {
     crw$date <- as_date(crw$date)
     tracks$date <- as_date(tracks$date)
     
-    # 2. Create BRTs
-    
-    #create parameter grid to vary hyperparameters
-    param_grid <- expand.grid(interaction.depth = c(1, 3, 5),
-                              n.trees = seq(1000, 10000, 1000),
-                              shrinkage = c(0.005, 0.01, 0.5),
-                              n.minobsinnode = 20)
-    
-    #setup 10-fold cross-validation
-    cv_scheme <- trainControl(method = "cv", number = 10, verboseIter = FALSE,
-                              summaryFunction = twoClassSummary, classProbs = TRUE)
+    # 2. Create GAMs
     
     #BUFFER
     #remove non-predictor columns
     buff_sel <- buff %>% select(all_of(predictors), pa)
+    
+    #remove SIC if less than 5 distinct values
+    if(n_distinct(buff_sel$sic) < 5){
+      buff_sel <- buff_sel %>% select(-sic)
+    }
     
     #remove columns where missing data is over 10% of rows
     if(sum(is.na(buff_sel)) > 0.1*nrow(buff_sel)){
       buff_sel <- buff_sel[colSums(is.na(buff_sel)) < 0.1*nrow(buff_sel)]
     }
     
-    #remove NAs
-    buff_sel <- buff_sel %>% na.omit()
-    
-    #perform tuning search
-    X <- buff_sel %>% select(-pa)
-    Y <- as.factor(buff_sel$pa)
-    buff_gbm <- train(x = X, y = Y, method = "gbm", metric = "ROC", trControl = cv_scheme, 
-                     tuneGrid = param_grid)
-    
-    #save parameter results
-    buff_params <- buff_gbm$bestTune
-    buff_params$pseudo <- "buff"
+    #run gam
+    buff_gam <- pred_gam(buff_sel)
     
     #save model
-    saveRDS(buff_gbm, 
-            file = paste0("output/spatial/", this.species, "/", this.site, "/", this.stage, "/buff_gbm.RDS"))
+    saveRDS(buff_gam, 
+            file = paste0("output/spatial/", this.species, "/", this.site, "/", this.stage, "/buff_gam.RDS"))
     
     #remove unnecessary parameters to continue
-    rm(buff_sel, buff_mice, X, Y)
+    rm(buff_sel)
     
     
     #BACKGROUND
     #remove non-predictor columns
-    back_sel <- back %>% select(all_of(predictors), pa) 
+    back_sel <- back %>% select(all_of(predictors), pa)
+    
+    #remove SIC if less than 5 distinct values
+    if(n_distinct(back_sel$sic) < 5){
+      back_sel <- back_sel %>% select(-sic)
+    }
     
     #remove columns where missing data is over 10% of rows
     if(sum(is.na(back_sel)) > 0.1*nrow(back_sel)){
       back_sel <- back_sel[colSums(is.na(back_sel)) < 0.1*nrow(back_sel)]
     }
     
-    #remove NAs
-    back_sel <- back_sel %>% na.omit()
-    
-    #perform tuning search
-    X <- back_sel %>% select(-pa)
-    Y <- as.factor(back_sel$pa)
-    back_gbm <- train(x = X, y = Y, method = "gbm", metric = "ROC", trControl = cv_scheme, 
-                     tuneGrid = param_grid)
-    
-    #save parameter results
-    back_params <- back_gbm$bestTune
-    back_params$pseudo <- "back"
+    #run gam
+    back_gam <- pred_gam(back_sel)
     
     #save model
-    saveRDS(back_gbm, 
-            file = paste0("output/spatial/", this.species, "/", this.site, "/", this.stage, "/back_gbm.RDS"))
+    saveRDS(back_gam, 
+            file = paste0("output/spatial/", this.species, "/", this.site, "/", this.stage, "/back_gam.RDS"))
     
     #remove unnecessary parameters to continue
-    rm(back_sel, back_mice, X, Y)
+    rm(back_sel)
     
     
     #CRWs
     #remove non-predictor columns
     crw_sel <- crw %>% select(all_of(predictors), pa)
     
+    #remove SIC if less than 5 distinct values
+    if(n_distinct(crw_sel$sic) < 5){
+      crw_sel <- crw_sel %>% select(-sic)
+    }
+    
     #remove columns where missing data is over 10% of rows
     if(sum(is.na(crw_sel)) > 0.1*nrow(crw_sel)){
       crw_sel <- crw_sel[colSums(is.na(crw_sel)) < 0.1*nrow(crw_sel)]
     }
     
-    #remove NAs
-    crw_sel <- crw_sel %>% na.omit()
-    
-    #perform tuning search
-    X <- crw_sel %>% select(-pa)
-    Y <- as.factor(crw_sel$pa)
-    crw_gbm <- train(x = X, y = Y, method = "gbm", metric = "ROC", trControl = cv_scheme, 
-                    tuneGrid = param_grid)
-    
-    #save parameter results
-    crw_params <- crw_gbm$bestTune
-    crw_params$pseudo <- "crw"
+    #run gam
+    crw_gam <- pred_gam(crw_sel)
     
     #save model
-    saveRDS(crw_gbm, 
-            file = paste0("output/spatial/", this.species, "/", this.site, "/", this.stage, "/crw_gbm.RDS"))
+    saveRDS(crw_gam, 
+            file = paste0("output/spatial/", this.species, "/", this.site, "/", this.stage, "/crw_gam.RDS"))
     
     #remove unnecessary parameters to continue
-    rm(crw_sel, crw_mice, X, Y)
+    rm(crw_sel)
     
     
-    #EXPORT
-    #hyperparameter tuning values
-    hyper_values <- rbind(buff_params, back_params, crw_params)
-    saveRDS(hyper_values, 
-            file = paste0("output/spatial/", this.species, "/", this.site, "/", this.stage, "/brt_hyperparameter_values.RDS"))
     
-    
-    # 3. Test BRTs
+    # 3. Test GAMs
     
     #filter spatial metadata to this species and stage
     meta3 <- meta2 %>% filter(Species == this.species & Stage == this.stage)
@@ -198,8 +180,8 @@ foreach(z=1:nrow(meta)) %dopar% {
     meta3$Site <- as.factor(meta3$Site)
     sites <- levels(meta3$Site)
     
-    #null table for output
-    gbm_boyce_final <- NULL
+    #null table for loop
+    gam_boyce_final <- NULL
     
     #run for loop to test each site
     for(i in sites){
@@ -209,35 +191,33 @@ foreach(z=1:nrow(meta)) %dopar% {
       back_test <- read.csv(paste0("output/spatial/", this.species, "/", this.stage, "/extraction/", test.site, "_background.csv"))
       tracks_test <- read.csv(paste0("output/spatial/", this.species, "/", this.stage, "/extraction/", test.site, "_presences.csv"))
       
-      #only select predictors for testing
-      back_test <- back_test %>% select(all_of(predictors))
-      tracks_test <- tracks_test %>% select(all_of(predictors))
-      
       #predict and evaluate buffers
-      p1 <- predict(buff_gbm, tracks_test, type = "prob")[,1]
-      p2 <- predict(buff_gbm, back_test, type = "prob")[,1]
-      buff_gbm_boyce <- evalContBoyce(p1, p2)
+      p1 <- predict.gam(buff_gam, tracks_test, type = "response")
+      p2 <- predict.gam(buff_gam, back_test, type = "response")
+      buff_gam_boyce <- evalContBoyce(p1, p2, na.rm=TRUE)
       
       #predict and evaluate background
-      p1 <- predict(back_gbm, tracks_test, type = "prob")[,1]
-      p2 <- predict(back_gbm, back_test, type = "prob")[,1]
-      back_gbm_boyce <- evalContBoyce(p1, p2)
+      p1 <- predict.gam(back_gam, tracks_test, type = "response")
+      p2 <- predict.gam(back_gam, back_test, type = "response")
+      back_gam_boyce <- evalContBoyce(p1, p2, na.rm=TRUE)
       
       #predict and evaluate crws
-      p1 <- predict(crw_gbm, tracks_test, type = "prob")[,1]
-      p2 <- predict(crw_gbm, back_test, type = "prob")[,1]
-      crw_gbm_boyce <- evalContBoyce(p1, p2)
+      p1 <- predict.gam(crw_gam, tracks_test, type = "response")
+      p2 <- predict.gam(crw_gam, back_test, type = "response")
+      crw_gam_boyce <- evalContBoyce(p1, p2, na.rm=TRUE)
       
       #FINAL DATA
       #boyce scores
-      gbm_boyce <- expand.grid(buff = buff_gbm_boyce, back = back_gbm_boyce, crw = crw_gbm_boyce)
-      gbm_boyce$site <- i
-      gbm_boyce_final <- rbind(gbm_boyce_final, gbm_boyce)
+      gam_boyce <- expand.grid(buff = buff_gam_boyce, back = back_gam_boyce, crw = crw_gam_boyce)
+      gam_boyce$site <- i
+      gam_boyce_final <- rbind(gam_boyce_final, gam_boyce)
     }
     
     #export boyce scores
-    saveRDS(gbm_boyce_final, 
-            file = paste0("output/spatial/", this.species, "/", this.site, "/", this.stage, "/boyce_scores_gbm.RDS"))
+    saveRDS(gam_boyce_final, 
+            file = paste0("output/spatial/", this.species, "/", this.site, "/", this.stage, "/boyce_scores_gam.RDS"))
+    
+    print(paste0(this.species, " ", this.stage, " ", this.site, " completed"))
     
   })
   

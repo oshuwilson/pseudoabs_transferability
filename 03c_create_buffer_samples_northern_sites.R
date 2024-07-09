@@ -1,11 +1,12 @@
-#creating buffer samples for when tracks exceed projection limits
-#used for Marion SOES, Marion ANFS, and South_Georgia MAPE
-#shorter script, but takes spatiotemp_pseudoabs takes longer on big datasets
-#won't work on data where species cross lon = 180/lon = -180
+#creating buffer samples for when tracks exceed ESPG 6932 projection limits
+#used for Marion SOES, Marion ANFS, Marion SUFS and South_Georgia MAPE
+#shorter script, but takes spatiotemp_pseudoabs longer
 
+#clear workspace and set working directory
 rm(list=ls())
 setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
+#load required packages
 {
   library(dynamicSDM)
   library(sf)
@@ -22,27 +23,30 @@ setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 coast <- load_Coastline()
 coast_v <- vect(coast)
 
+#download oceans file for masking
 oceans <- ne_download(scale = "medium", category = "physical", type = "ocean", returnclass = "sf")
 
 #refresh from here
 rm(list=setdiff(ls(), c("oceans","coast", "coast_v")))
 
 #read in species/site/stage - Need to do SOES Marion post-moult
-this.species <- "SOES"
+this.species <- "ANFS"
 this.site <- "Marion"
-this.stage <- "post-moult"
-buff.value <- 51262
+this.stage <- "breeding"
+buff.value <- 58968
 
 # 1. Format data for dynamicSDM
 #change spreadsheet name for each species
 tracks <- read.csv(paste0("data/tracks_by_stage/", this.species, "/", this.site, "/", this.stage, ".csv"))
 tracks$date <- as.POSIXct(tracks$date, format = "%Y-%m-%d %H:%M:%S")
 tracks$individual_id <- as.factor(tracks$individual_id)
+tracks <- tracks %>% select(date, x, y)
 
 #isolate a day month and year column
 tracks$day <- as.numeric(day(tracks$date))
 tracks$month <- month(tracks$date)
 tracks$year <- year(tracks$date)
+
 
 #filter to remove points with NA or invalid coordinates and dates
 tracks <- spatiotemp_check(occ.data = tracks,
@@ -57,7 +61,6 @@ tracks_terra <- vect(tracks,
                      geom = c("x", "y"),
                      crs = "epsg:4326")
 tracks_terra <- project(tracks_terra, "EPSG:6932")
-
 plot(tracks_terra, pch=".")
 
 # 2. Exclude land points from tracks
@@ -84,7 +87,6 @@ train_tracks <- as.data.frame(tracks_terra, geom="XY")
 #use oceans file for these examples
 
 # 4. Sample buffer pseudo-absences 
-
 #run buffer creation script
 suppressMessages( #suppress message when temporal.buffer=0
   buffers <- spatiotemp_pseudoabs(occ.data = train_tracks,
@@ -105,8 +107,9 @@ terra::plot(terra::vect(buffers[, c("x", "y")],
 
 
 # 5. Export buffers
+#format dataframe
 buffers$date <- as.Date(with(buffers, paste(year, month, day, sep="-")), "%Y-%m-%d")
 buffers <- select(buffers, x, y, date)
 
-#only when happy export
+#export
 write.csv(buffers, paste0("output/buffers/", this.species, "/", this.site, "/", this.stage, ".csv"))

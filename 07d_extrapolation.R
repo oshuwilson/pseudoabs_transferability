@@ -1,10 +1,11 @@
-#calculate extrapolation for each temporal test
-#SOES Marion post-moult incomplete. Need to do SOES WAP and SG ones too.
+#automated script to test spatial extrapolation
 
+#clear workspace and set working directory
 rm(list=ls())
-#setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
-setwd("/mainfs/home/jcw2g17/Chapter 01/")
+#setwd("/mainfs/home/jcw2g17/Chapter 01/")
+setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
+#load required packages
 {
   library(lubridate)
   library(flexsdm)
@@ -13,16 +14,21 @@ setwd("/mainfs/home/jcw2g17/Chapter 01/")
 
 #read in table with info for each species, site and stage
 meta <- read.csv("data/species_site_stage_metadata.csv")
+meta2 <- read.csv("output/spatial/spatial_site_metadata.csv")
 
 #define initial predictors
 predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "wind", "slope")
-meta <- meta[-c(1:15, 20:21),]
+
+#remove ANPE, EMPE, SUFS, and MAPE incubation/post-breeding (no spatial transfer)
+meta <- meta %>% filter(Species != "ANPE" & Species != "EMPE" & Species != "SUFS")
+meta <- meta %>% filter(Species != "MAPE" | 
+                          (Species == "MAPE" & Stage != "incubation" & Stage != "post-breeding"))
 
 #loop over every species, site, and stage
-for(z in 1:21){
+for(z in 1:nrow(meta)){
   
   #define parameters in loop
-  rm(list=setdiff(ls(), c("meta", "predictors", "z")))
+  rm(list=setdiff(ls(), c("meta", "predictors", "z", "meta2")))
   this.species <- meta[z, 1]
   this.site <- meta[z, 2]
   this.stage <- meta[z, 3]
@@ -59,101 +65,70 @@ for(z in 1:21){
   crw$date <- as_date(crw$date)
   tracks$date <- as_date(tracks$date)
   
+  # 2. Load in test data
+  #filter spatial metadata to this species and stage
+  meta3 <- meta2 %>% filter(Species == this.species & Stage == this.stage)
   
-  # 2. Isolate training and testing data
-  
-  #if season = FALSE, separate by year
-  if(season == FALSE){
-    buff$season <- year(buff$date)
-    back$season <- year(back$date)
-    crw$season <- year(crw$date)
-    tracks$season <- year(tracks$date)
-  }
-  
-  #if season = TRUE, separate by season
-  if(season == TRUE){
-    buff$season <- year(round_date(buff$date, unit="year"))
-    back$season <- year(round_date(back$date, unit="year"))
-    crw$season <- year(round_date(crw$date, unit="year"))
-    tracks$season <- year(round_date(tracks$date, unit="year"))
-  }
-  
-  #extract seasons for loop
-  seasons <- levels(as.factor(tracks$season))
+  #extract list of sites for this species and stage
+  meta3$Site <- as.factor(meta3$Site)
+  sites <- levels(meta3$Site)
   
   #create empty table
   shape_values <- NULL
   shape_all <- NULL
   
   #loop over each season
-  for(i in seasons){
-    this.test <- i
+  for(i in sites){
+    test.site <- i
     
-    #extract training data
-    buff_train <- buff %>% filter(season != this.test) %>% select(all_of(predictors), pa)
-    back_train <- back %>% filter(season != this.test) %>% select(all_of(predictors), pa)
-    crw_train <- crw %>% filter(season != this.test) %>% select(all_of(predictors), pa)
-    tracks_train <- tracks %>% filter(season != this.test) %>% select(all_of(predictors), pa)
+    #load in test data
+    back_test <- read.csv(paste0("output/spatial/", this.species, "/", this.stage, "/extraction/", test.site, "_background.csv"))
+    tracks_test <- read.csv(paste0("output/spatial/", this.species, "/", this.stage, "/extraction/", test.site, "_presences.csv"))
     
-    #extract testing data
-    back_test <- back %>% filter(season == this.test) %>% select(all_of(predictors))
+    #remove chl and/or wind from predictors list if relevant
+    meta4 <- meta3 %>% filter(Site == test.site)
+    if(meta4$Missing[1] == "windchl"){
+      shape_predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "slope")
+    }
+    
+    if(meta4$Missing[1] == "chl"){
+      shape_predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "wind", "eke", "slope")
+    }
+    
+    if(meta4$Missing[1] == ""){
+      shape_predictors <- predictors
+    }
     
     #fix sea ice if all values = 0
-    if(sum(back_test$sic) == 0){
-      back_test <- back_test %>% select(-sic)
+    if(sum(back_test$sic) == 0 & sum(back$sic == 0)){
+      shape_predictors <- shape_predictors[shape_predictors != "sic"]
     }
     
-    #if test data is missing over 10% of a predictor, remove predictor
-    pred_check <- back_test
-    if(sum(is.na(pred_check)) > 0.1*nrow(pred_check)){
-      pred_check <- pred_check[colSums(is.na(pred_check)) < 0.1*nrow(pred_check)]
-    }
-    predictors2 <- names(pred_check)
+    #only select predictors for training and testing
+    back_test <- back_test %>% select(all_of(shape_predictors))
+    tracks_test <- tracks_test %>% select(all_of(shape_predictors))
+    
+    buff_train <- buff %>% select(all_of(shape_predictors), pa)
+    back_train <- back %>% select(all_of(shape_predictors), pa)
+    crw_train <- crw %>% select(all_of(shape_predictors), pa)
+    
+    #merge testing data with PA column
+    tracks_test$pa <- 1
+    back_test$pa <- 0
+    test_data <- rbind(tracks_test, back_test)
     
     #BUFFERS
-    #remove predictors if over 10% of column is NA
-    pred_check <- buff_train %>% select(all_of(predictors2))
-    if(sum(is.na(pred_check)) > 0.1*nrow(pred_check)){
-      pred_check <- pred_check[colSums(is.na(pred_check)) < 0.1*nrow(pred_check)]
-    }
-    buff_predictors <- names(pred_check)
-    
-    #make testing data the same columns
-    buff_testing <- back_test %>% select(all_of(buff_predictors))
-    
     #calculate shape
-    buff_shape <- extra_eval(training_data = buff_train, pr_ab = "pa", projection_data = buff_testing, n_cores = 40)
-    
+    buff_shape <- extra_eval(training_data = buff_train, pr_ab = "pa", projection_data = test_data, n_cores = 7)
     
     #BACKGROUND
-    #remove predictors if over 10% of column is NA
-    pred_check <- back_train %>% select(all_of(predictors2))
-    if(sum(is.na(pred_check)) > 0.1*nrow(pred_check)){
-      pred_check <- pred_check[colSums(is.na(pred_check)) < 0.1*nrow(pred_check)]
-    }
-    back_predictors <- names(pred_check)
-    
-    #make testing data the same columns
-    back_testing <- back_test %>% select(all_of(back_predictors))
-    
     #calculate shape
-    back_shape <- extra_eval(training_data = back_train, pr_ab = "pa", projection_data = back_testing, n_cores = 40)
-    
-    
-    #CRW
-    #remove predictors if over 10% of column is NA
-    pred_check <- crw_train %>% select(all_of(predictors2))
-    if(sum(is.na(pred_check)) > 0.1*nrow(pred_check)){
-      pred_check <- pred_check[colSums(is.na(pred_check)) < 0.1*nrow(pred_check)]
-    }
-    crw_predictors <- names(pred_check)
-    
-    #make testing data the same columns
-    crw_testing <- back_test %>% select(all_of(crw_predictors))
-    
-    #calculate shape
-    crw_shape <- extra_eval(training_data = crw_train, pr_ab = "pa", projection_data = crw_testing, n_cores = 40)
+    back_shape <- extra_eval(training_data = back_train, pr_ab = "pa", projection_data = test_data, n_cores = 7)
 
+    #CRW
+    #calculate shape
+    crw_shape <- extra_eval(training_data = crw_train, pr_ab = "pa", projection_data = test_data, n_cores = 7)
+    
     #store scores
     shape_scores <- cbind(buff_shape[,1], back_shape[,1], crw_shape[,1])
     names(shape_scores) <- c("buff", "back", "crw")
@@ -166,23 +141,22 @@ for(z in 1:21){
     #format data table with all LQ, median, and UQ values
     shape_IQR <- as.data.frame(rbind(buffers, background, CRWs))
     names(shape_IQR) <- c("LQ", "Median", "UQ")
-    shape_IQR$season <- this.test
+    shape_IQR$region <- test.site
     shape_IQR$pseudo <- c("buffers", "background", "CRWs")
     
     #bind to dataset with information for every season
     shape_values <- rbind(shape_values, shape_IQR)
     
-    #do the same for scores of entire dataset
-    shape_scores$season <- this.test
+    shape_scores$region <- test.site
     shape_all <- rbind(shape_all, shape_scores)
     
   }
   
   #export dataset
   saveRDS(shape_values,
-          file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/shape_medians.RDS"))
+          file = paste0("output/spatial/", this.species, "/", this.site, "/", this.stage, "/shape_medians.RDS"))
   saveRDS(shape_all,
-          file = paste0("output/leave-year-out/", this.species, "/", this.site, "/", this.stage, "/shape_scores.RDS"))
+          file = paste0("output/spatial/", this.species, "/", this.site, "/", this.stage, "/shape_scores.RDS"))
   
   #print to show that this species has completed
   print(paste0(this.species, " ", this.site, " ", this.stage, " completed"))
