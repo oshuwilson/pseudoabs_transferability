@@ -93,7 +93,7 @@ suppressMessages( #suppress message when temporal.buffer=0
                                   spatial.method = "buffer",
                                   spatial.ext = oceans, 
                                   temporal.method = "buffer",
-                                  spatial.buffer = c(12000,buff.value), #9000 ensures that pseudoabs falls in a different cell
+                                  spatial.buffer = c(11320,buff.value), #11320 ensures that pseudoabs falls in a different cell
                                   temporal.buffer = 0,
                                   n.pseudoabs = nrow(train_tracks),
                                   prj = "+proj=longlat +datum=WGS84"))
