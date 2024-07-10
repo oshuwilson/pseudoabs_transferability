@@ -1,4 +1,4 @@
-#creating buffer samples for when tracks exceed ESPG 6932 projection limits
+#creating buffer samples for when tracks exceed EPSG 6932 projection limits
 #used for Marion SOES, Marion ANFS, Marion SUFS and South_Georgia MAPE
 #shorter script, but takes spatiotemp_pseudoabs longer
 
