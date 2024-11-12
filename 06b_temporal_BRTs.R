@@ -24,7 +24,7 @@ predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "e
 #setup parallel programming
 registerDoParallel(cores = 21)
 
-#loop to run through each species, stage, and site iteratively
+#loop to run through each species, stage, and site 
 foreach(z = 1:21) %dopar% {
   try({
     

@@ -32,7 +32,8 @@ dynamic_extract <- function(predictor, tracks){
     #for loop by yday
     for(i in ydays){
       points <- filter(trax, yday==i) #subsets by yday
-      slice <- pred_crop[[as.numeric(i)]] #slices raster by yday
+      yday.date <- as_date(first(points$date)) #extracts date for yday
+      slice <- pred_crop[[time(pred_crop) == yday.date]] #slices raster by yday
       xtracted <- extract(slice, points, ID=F, bind=T) #extract values from slice
       xtracted_df <- as.data.frame(xtracted, geom="XY") #create dataframe for binding
       names(xtracted_df)[length(names(xtracted_df))-2] <- predictor #rename column to predictor name
@@ -89,7 +90,8 @@ dynamic_chlorophyll <- function(predictor, tracks){
     #for loop by yday
     for(i in ydays){
       points <- filter(trax, yday==i) #subsets by yday
-      slice <- pred_crop[[as.numeric(i)]] #slices raster by yday
+      yday.date <- as_date(first(points$date)) #extracts date for yday
+      slice <- pred_crop[[time(pred_crop) == yday.date]] #slices raster by yday
       xtracted <- extract(slice, points, ID=F, bind=T) #extract values from slice
       xtracted_df <- as.data.frame(xtracted, geom="XY") #create dataframe for binding
       names(xtracted_df)[length(names(xtracted_df))-2] <- predictor #rename column to predictor name
@@ -193,7 +195,7 @@ dynamic_wind <- function(predictor, tracks, direction){
     #for loop by month
     for(i in months){
       points <- filter(trax, month==i) #subsets by month
-      slice <- pred_crop[[as.numeric(i)]] #slices raster by month
+      slice <- pred_crop[[month(time(pred_crop)) == as.numeric(i)]] #slices raster by month
       xtracted <- extract(slice, points, ID=F, bind=T) #extract values from slice
       xtracted_df <- as.data.frame(xtracted, geom="XY") #create dataframe for binding
       names(xtracted_df)[length(names(xtracted_df))-2] <- paste0(predictor, "_", direction) #rename column to predictor name

@@ -12,16 +12,17 @@ setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
 ###Temporal###
 #read in Boyce scores and mixed-effects model
-boyce <- readRDS("output/leave-year-out/boyce_final.RDS")
+boyce <- readRDS("output/leave-year-out/boyce_filtered.RDS")
 
 #redefine levels
 levels(boyce$pseudo) <- c("Background", "Buffer", "CRW")
 
 #plot - sample size
-p1 <- ggplot(boyce, aes(x=n, y=score)) + geom_point(colour="lightgrey") + theme_classic() +
+p1 <- ggplot(boyce, aes(x=n, y=score, group = algopseudo)) + theme_classic() +
+  geom_point(colour="lightgrey") +
   geom_smooth(method="gam", formula = y ~ s(x, bs = "cs", k=3), 
-              aes(col=pseudo, linetype=algorithm), se=F) +
-  scale_color_manual(values=c("red3", "steelblue4", "thistle")) + 
+              aes(col=pseudo, linetype=algorithm), se=F, linewidth=1.5) +
+  scale_color_manual(values=c("red3", "steelblue4", "orange2")) + 
   xlab("Training Data Sample Size") + 
   ylab("Continuous Boyce Index Score") +
   scale_x_log10(breaks = c(2000, 20000, 200000), labels = scales::comma) +
@@ -31,10 +32,11 @@ p1 <- ggplot(boyce, aes(x=n, y=score)) + geom_point(colour="lightgrey") + theme_
 p1
 
 #plot - sample size vs extrapolation
-p2 <- ggplot(boyce, aes(x=n, y=Median)) + geom_point(colour="lightgrey") + theme_classic() +
+p2 <- ggplot(boyce, aes(x=n, y=Median)) + 
+  geom_point(colour="lightgrey") + theme_classic() +
   geom_smooth(method="gam", formula = y ~ s(x, bs = "cs", k=3), 
-              aes(col=pseudo), se=F) +
-  scale_color_manual(values=c("red3", "steelblue4", "thistle")) + 
+              aes(col=pseudo), se=F, linewidth = 1.5) +
+  scale_color_manual(values=c("red3", "steelblue4", "orange2")) + 
   xlab("Training Data Sample Size") + 
   ylab("Median Shape Value") +
   scale_x_log10(breaks = c(2000, 20000, 200000), labels = scales::comma) +
@@ -51,27 +53,31 @@ boyce <- readRDS("output/spatial/boyce_final.RDS")
 levels(boyce$pseudo) <- c("Background", "Buffer", "CRW")
 
 #plot - sample size
-p3 <- ggplot(boyce, aes(x=n, y=score)) + geom_point(colour="lightgrey") + theme_classic() +
+p3 <- ggplot(boyce, aes(x=n, y=score)) + theme_classic() +
+  geom_point(colour="lightgrey") +
   geom_smooth(method="gam", formula = y ~ s(x, bs = "cs", k=3), 
-              aes(col=pseudo, linetype=algorithm), se=F) +
-  scale_color_manual(values=c("red3", "steelblue4", "thistle"), labels = c("Background", "Buffer", "CRW")) + 
+              aes(col=pseudo, linetype=algorithm), se=F, linewidth=1.5) +
+  scale_color_manual(values=c("red3", "steelblue4", "orange2"), labels = c("Background", "Buffer", "CRW")) + 
   xlab("Training Data Sample Size") + 
   ylab("Continuous Boyce Index Score") +
   scale_x_log10(breaks = c(3000, 20000, 200000), labels = scales::comma) +
   guides(linetype = guide_legend(override.aes = list(colour = "black"), title = "Algorithm"),
          colour = guide_legend(title = "Pseudo-Absence")) +
-  scale_y_continuous(limits=c(-1, 1), expand=c(0.01,0.01))
+  scale_y_continuous(limits=c(-1, 1), expand=c(0.01,0.01)) +
+  theme(legend.key.width = unit(3, "line"))
 p3
 
 #plot - sample size vs extrapolation
-p4 <- ggplot(boyce, aes(x=n, y=Median)) + geom_point(colour="lightgrey") + theme_classic() +
+p4 <- ggplot(boyce, aes(x=n, y=Median)) + 
+  geom_point(colour="lightgrey") + theme_classic() +
   geom_smooth(method="gam", formula = y ~ s(x, bs = "cs", k=3), 
-              aes(col=pseudo), se=F) +
-  scale_color_manual(values=c("red3", "steelblue4", "thistle"), labels = c("Background", "Buffer", "CRW")) + 
+              aes(col=pseudo), se=F, linewidth = 1.5) +
+  scale_color_manual(values=c("red3", "steelblue4", "orange2"), labels = c("Background", "Buffer", "CRW")) + 
   xlab("Training Data Sample Size") + 
   ylab("Median Shape Value") +
   scale_x_log10(breaks = c(3000, 20000, 200000), labels = scales::comma) +
-  guides(colour = guide_legend(title = "Pseudo-Absence"))
+  guides(colour = guide_legend(title = "Pseudo-Absence"))+
+  theme(legend.key.width = unit(3, "line"))
 p4
 
 ###BOTH###
@@ -81,9 +87,13 @@ p4
 p1 <- p1 + guides(linetype = "none", colour = "none")
 p3 <- p3 + ylab("")
 
+#add titles
+p1 <- p1 + ggtitle("Temporal Transfer")
+p3 <- p3 + ggtitle("Spatial Transfer")
+
 #create multiplot
 plots <- plot_grid(p1, p3 + theme(legend.position="none"),
-                   ncol=2, align="v", labels = "AUTO")
+                   ncol=2, align="v")
 plots
 
 #extract legend
@@ -97,9 +107,13 @@ plot_grid(plots, legend, rel_widths = c(4,0.5))
 p2 <- p2 + guides(linetype = "none", colour = "none")
 p4 <- p4 + ylab("")
 
+#add titles
+p2 <- p2 + ggtitle("Temporal Transfer")
+p4 <- p4 + ggtitle("Spatial Transfer")
+
 #create multiplot
 plots <- plot_grid(p2, p4 + theme(legend.position="none"),
-                   ncol=2, align="v", labels = "AUTO")
+                   ncol=2, align="v")
 plots
 
 #extract legend

@@ -32,7 +32,7 @@ rm(list=setdiff(ls(), c("oceans","coast", "coast_v")))
 #read in species/site/stage - Need to do SOES Marion post-moult
 this.species <- "ANFS"
 this.site <- "Marion"
-this.stage <- "breeding"
+this.stage <- "post-moult"
 buff.value <- 58968
 
 # 1. Format data for dynamicSDM

@@ -14,10 +14,10 @@ setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
 #setup
 rm(list=ls())
-this.species <- "ADPE"
-this.site <- "Pointe_Geologie"
-this.stage <- "chick-rearing"
-pseudo.type <- "background" #either background, buffers, or CRWs
+this.species <- "ANFS"
+this.site <- "Marion"
+this.stage <- "post-moult"
+pseudo.type <- "buffers" #either background, buffers, or CRWs
 
 #read in pseudo - for background run for each test year too
 pseudo <- read.csv(paste0("output/", pseudo.type, "/", this.species, "/", this.site, "/", this.stage, ".csv"))
@@ -134,7 +134,6 @@ pseudo <- pseudo %>% filter(date >= cutoff_00)
 pseudo <- dynamic_wind(predictor = "wind", pseudo, direction = "east")
 pseudo <- dynamic_wind(predictor = "wind", pseudo, direction = "north")
 pseudo$wind <- sqrt(pseudo$wind_east^2 + pseudo$wind_north^2)
-ggplot(pseudo, aes(x=wind)) + geom_density()
 
 #extract data in 1999 and rejoin data together
 if(min_date < cutoff_00){

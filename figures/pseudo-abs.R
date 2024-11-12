@@ -55,25 +55,37 @@ crop_coast <- crop(coast, e)
 
 #plots
 ggplot() +
-  geom_spatvector(data = buffer, size=0.1, col = "cadetblue") + 
+  geom_spatvector(data = buffer, size=0.1, col = "cadetblue4") + 
   geom_spatvector(data = tracks, size=0.1, col = "black") +
-  geom_spatvector(data=crop_coast, fill="grey") + theme_void() + 
+  geom_spatvector(data=crop_coast, fill="grey") + 
+  theme_void() + 
   xlim(-3066418.83637174, -2183192.10410952) +
   ylim(2858741.12954235, 3718285.10207138)
+
+ggsave(filename = "text/figures/pseudo-abs/buffer.png",
+       width = 8, height = 6)
 
 ggplot() +
   geom_spatvector(data = background, size=0.1, col = "cadetblue") + 
   geom_spatvector(data = tracks, size=0.1, col = "black") +
-  geom_spatvector(data=crop_coast, fill="grey") + theme_void() +
+  geom_spatvector(data=crop_coast, fill="grey") + 
+  theme_void() +
   xlim(-3066418.83637174, -2183192.10410952) +
   ylim(2858741.12954235, 3718285.10207138)
+
+ggsave(filename = "text/figures/pseudo-abs/background.png",
+       width = 8, height = 6)
 
 ggplot() +
   geom_spatvector(data = crw, size=0.1, col = "cadetblue") + 
   geom_spatvector(data = tracks, size=0.1, col = "black") +
-  geom_spatvector(data=crop_coast, fill="grey") + theme_void() +
+  geom_spatvector(data=crop_coast, fill="grey") + 
+  theme_void() +
   xlim(-3066418.83637174, -2183192.10410952) +
   ylim(2858741.12954235, 3718285.10207138)
+
+ggsave(filename = "text/figures/pseudo-abs/crw.png",
+       width = 8, height = 6)
 
 #South Georgia S/O Map
 bbox <- ext(-3066418.83637174, -2183192.10410952, 2858741.12954235, 3718285.10207138)
@@ -85,5 +97,8 @@ ggplot() +
   xlim(-5180778.6221, 5180778.6221) +
   ylim(-5180778.6221, 5180778.6221) + 
   theme(plot.background = element_rect(fill = "lightblue2"))
+
+ggsave(filename = "text/figures/pseudo-abs/inset.svg",
+       width = 8, height = 6)
 
 ext(coast)

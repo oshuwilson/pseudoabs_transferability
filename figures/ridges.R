@@ -13,7 +13,7 @@ setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 
 ###Temporal###
 #read in Boyce scores and mixed-effects model
-boyce <- readRDS("output/leave-year-out/boyce_final.RDS")
+boyce <- readRDS("output/leave-year-out/boyce_filtered.RDS")
 levels(boyce$algopseudo)
 levels(boyce$algopseudo) <- c("BRT Background", "BRT Buffer", "BRT CRW",
                                     "GAM Background", "GAM Buffer", "GAM CRW",
@@ -34,7 +34,7 @@ p1 <- ggplot(boyce, (aes(x=score, y=fct_reorder(algopseudo, score, .fun=median),
   geom_vline(xintercept = 0, col="black", linetype="dashed") +
   theme(axis.text.y = element_text(vjust = -1.5),
         axis.title.y = element_text(margin = margin(t = 0, r = 20, b = 0, l = 0)))
-p1            
+p1 
 
 ###Spatial###
 rm(list=setdiff(ls(), "p1"))
@@ -62,9 +62,12 @@ p2 <- ggplot(boyce, (aes(x=score, y=fct_reorder(algopseudo, score, .fun=median),
         axis.title.y = element_text(margin = margin(t = 0, r = 20, b = 0, l = 0)))
 p2
 
-
 ###BOTH###
 #edit p2
 p2 <- p2 + ylab("")
 
-plot_grid(p1, p2, ncol=2, align="h", labels="AUTO")
+#add titles
+p1 <- p1 + ggtitle("Temporal Transfer")
+p2 <- p2 + ggtitle("Spatial Transfer")
+
+plot_grid(p1, p2, ncol=2, align="h")
