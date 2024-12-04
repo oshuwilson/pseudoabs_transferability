@@ -27,11 +27,11 @@ summ(m1)
 
 #plot
 p1 <- ggplot(boyce, (aes(x=score, y=fct_reorder(algopseudo, score, .fun=median), fill=fct_reorder(algopseudo, score, .fun=median)))) + 
-  geom_density_ridges2(scale=2) + theme_minimal(base_size = 14) +
+  geom_density_ridges2(scale=2, linewidth = 0.1) + theme_minimal() +
   xlab("Continuous Boyce Index Score") + 
   ylab("Algorithm and Pseudo-Absence Technique") +
   scale_fill_brewer(guide = "none") + scale_x_continuous(expand=c(0,0), limits=c(-1,1)) + 
-  geom_vline(xintercept = 0, col="black", linetype="dashed") +
+  geom_vline(xintercept = 0, col="black", linetype="dashed", size = 0.2) +
   theme(axis.text.y = element_text(vjust = -1.5),
         axis.title.y = element_text(margin = margin(t = 0, r = 20, b = 0, l = 0)))
 p1 
@@ -54,10 +54,10 @@ summ(m1)
 
 #plot
 p2 <- ggplot(boyce, (aes(x=score, y=fct_reorder(algopseudo, score, .fun=median), fill=fct_reorder(algopseudo, score, .fun=median)))) + 
-  geom_density_ridges2(scale=2) + theme_minimal(base_size = 14) +
+  geom_density_ridges2(scale=2, linewidth = 0.1) + theme_minimal() +
   xlab("Continuous Boyce Index Score") + ylab("Algorithm and Pseudo-Absence Technique") +
   scale_fill_brewer(guide = "none") + scale_x_continuous(expand=c(0,0), limits=c(-1,1)) + 
-  geom_vline(xintercept = 0, col="black", linetype="dashed") +
+  geom_vline(xintercept = 0, col="black", linetype="dashed", size = 0.2) +
   theme(axis.text.y = element_text(vjust = -1.5),
         axis.title.y = element_text(margin = margin(t = 0, r = 20, b = 0, l = 0)))
 p2
@@ -70,4 +70,18 @@ p2 <- p2 + ylab("")
 p1 <- p1 + ggtitle("Temporal Transfer")
 p2 <- p2 + ggtitle("Spatial Transfer")
 
-plot_grid(p1, p2, ncol=2, align="h")
+#change font sizes
+p1 <- p1 + theme_minimal(base_size = 7)
+p2 <- p2 + theme_minimal(base_size = 7)
+
+#plot together
+p3 <- plot_grid(p1, p2, ncol=2, align="h")
+p3
+
+#export png
+ggsave("text/figures/final figs/03_ridge_plot.png", p3,
+       width = 180, height = 80, dpi = 300, units = "mm")
+
+#export eps 
+ggsave("text/figures/final figs/03_ridge_plot.eps", p3,
+       width = 180, height = 80, dpi = 300, units = "mm")

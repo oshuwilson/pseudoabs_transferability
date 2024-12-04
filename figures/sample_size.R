@@ -19,9 +19,9 @@ levels(boyce$pseudo) <- c("Background", "Buffer", "CRW")
 
 #plot - sample size
 p1 <- ggplot(boyce, aes(x=n, y=score, group = algopseudo)) + theme_classic() +
-  geom_point(colour="lightgrey") +
+  geom_point(colour="lightgrey", size = 0.1) +
   geom_smooth(method="gam", formula = y ~ s(x, bs = "cs", k=3), 
-              aes(col=pseudo, linetype=algorithm), se=F, linewidth=1.5) +
+              aes(col=pseudo, linetype=algorithm), se=F, linewidth=0.6) +
   scale_color_manual(values=c("red3", "steelblue4", "orange2")) + 
   xlab("Training Data Sample Size") + 
   ylab("Continuous Boyce Index Score") +
@@ -33,9 +33,9 @@ p1
 
 #plot - sample size vs extrapolation
 p2 <- ggplot(boyce, aes(x=n, y=Median)) + 
-  geom_point(colour="lightgrey") + theme_classic() +
+  geom_point(colour="lightgrey", size = 0.1) + theme_classic() +
   geom_smooth(method="gam", formula = y ~ s(x, bs = "cs", k=3), 
-              aes(col=pseudo), se=F, linewidth = 1.5) +
+              aes(col=pseudo), se=F, linewidth = 0.6) +
   scale_color_manual(values=c("red3", "steelblue4", "orange2")) + 
   xlab("Training Data Sample Size") + 
   ylab("Median Shape Value") +
@@ -54,9 +54,9 @@ levels(boyce$pseudo) <- c("Background", "Buffer", "CRW")
 
 #plot - sample size
 p3 <- ggplot(boyce, aes(x=n, y=score)) + theme_classic() +
-  geom_point(colour="lightgrey") +
+  geom_point(colour="lightgrey", size = 0.1) +
   geom_smooth(method="gam", formula = y ~ s(x, bs = "cs", k=3), 
-              aes(col=pseudo, linetype=algorithm), se=F, linewidth=1.5) +
+              aes(col=pseudo, linetype=algorithm), se=F, linewidth=0.6) +
   scale_color_manual(values=c("red3", "steelblue4", "orange2"), labels = c("Background", "Buffer", "CRW")) + 
   xlab("Training Data Sample Size") + 
   ylab("Continuous Boyce Index Score") +
@@ -69,9 +69,9 @@ p3
 
 #plot - sample size vs extrapolation
 p4 <- ggplot(boyce, aes(x=n, y=Median)) + 
-  geom_point(colour="lightgrey") + theme_classic() +
+  geom_point(colour="lightgrey", size = 0.1) + theme_classic() +
   geom_smooth(method="gam", formula = y ~ s(x, bs = "cs", k=3), 
-              aes(col=pseudo), se=F, linewidth = 1.5) +
+              aes(col=pseudo), se=F, linewidth = 0.6) +
   scale_color_manual(values=c("red3", "steelblue4", "orange2"), labels = c("Background", "Buffer", "CRW")) + 
   xlab("Training Data Sample Size") + 
   ylab("Median Shape Value") +
@@ -91,6 +91,10 @@ p3 <- p3 + ylab("")
 p1 <- p1 + ggtitle("Temporal Transfer")
 p3 <- p3 + ggtitle("Spatial Transfer")
 
+#change font sizes
+p1 <- p1 + theme_classic(base_size = 7)
+p3 <- p3 + theme_classic(base_size = 7)
+
 #create multiplot
 plots <- plot_grid(p1, p3 + theme(legend.position="none"),
                    ncol=2, align="v")
@@ -100,7 +104,8 @@ plots
 legend <- get_legend(p3)
 
 #plots and legend together
-plot_grid(plots, legend, rel_widths = c(4,0.5))
+p5 <- plot_grid(plots, legend, rel_widths = c(4,0.5))
+p5
 
 #sample size vs extrapolation
 #modify p2 and p4
@@ -111,6 +116,10 @@ p4 <- p4 + ylab("")
 p2 <- p2 + ggtitle("Temporal Transfer")
 p4 <- p4 + ggtitle("Spatial Transfer")
 
+#change font sizes
+p2 <- p2 + theme_classic(base_size = 7)
+p4 <- p4 + theme_classic(base_size = 7)
+
 #create multiplot
 plots <- plot_grid(p2, p4 + theme(legend.position="none"),
                    ncol=2, align="v")
@@ -120,4 +129,17 @@ plots
 legend <- get_legend(p4)
 
 #plots and legend together
-plot_grid(plots, legend, rel_widths = c(4,0.5))
+p6 <- plot_grid(plots, legend, rel_widths = c(4,0.5))
+p6
+
+#export pngs
+ggsave("text/figures/final figs/05_sample_size.png", p5, 
+       width=180, height=75, units="mm", dpi = 300)
+ggsave("text/figures/final figs/s05_extrapolation.png", p6, 
+       width=180, height=75, units="mm", dpi = 300)
+
+#export eps
+ggsave("text/figures/final figs/05_sample_size.eps", p5, 
+       width=180, height=75, units="mm", dpi = 300)
+
+

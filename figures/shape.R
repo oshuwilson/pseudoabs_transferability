@@ -15,8 +15,8 @@ setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
 boyce <- readRDS("output/leave-year-out/boyce_filtered.RDS")
 
 #plot - log(median)
-p1 <- ggplot(boyce, aes(x=Median, y=score)) + geom_point(colour="lightgrey") + theme_classic() +
-  geom_smooth(method="gam", aes(col=pseudo, linetype=algorithm), se=F, linewidth = 1.5) +
+p1 <- ggplot(boyce, aes(x=Median, y=score)) + geom_point(colour="lightgrey", size = 0.1) + theme_classic() +
+  geom_smooth(method="gam", aes(col=pseudo, linetype=algorithm), se=F, linewidth = 0.6) +
   scale_color_manual(values=c("red3", "steelblue4", "orange2"), labels=c("Background", "Buffer", "CRW")) + 
   xlab("Median Shape Extrapolation Value") + 
   scale_x_log10(breaks = c(10, 20, 50, 100, 200)) + ylab("Continuous Boyce Index Score") +
@@ -32,8 +32,8 @@ rm(list=setdiff(ls(), "p1"))
 boyce <- readRDS("output/spatial/boyce_final.RDS")
 
 #plot - log(median)
-p2 <- ggplot(boyce, aes(x=Median, y=score)) + geom_point(colour="lightgrey") + theme_classic() +
-  geom_smooth(method="gam", aes(col=pseudo, linetype=algorithm), se=F, linewidth = 1.5) +
+p2 <- ggplot(boyce, aes(x=Median, y=score)) + geom_point(colour="lightgrey", size = 0.1) + theme_classic() +
+  geom_smooth(method="gam", aes(col=pseudo, linetype=algorithm), se=F, linewidth = 0.6) +
   scale_color_manual(values=c("red3", "steelblue4", "orange2"), labels=c("Background", "Buffer", "CRW")) + 
   xlab("Median Shape Extrapolation Value") + 
   scale_x_log10(breaks = c(10, 20, 50, 100, 200, 500)) + ylab("Continuous Boyce Index Score") +
@@ -52,6 +52,10 @@ p1 <- p1 + ggtitle("Temporal Transfer")
 p2 <- p2 + ggtitle("Spatial Transfer") +
   theme(legend.key.width = unit(3, "line"))
 
+#change font sizes
+p1 <- p1 + theme_classic(base_size = 7)
+p2 <- p2 + theme_classic(base_size = 7)
+
 #create multiplot
 plots <- plot_grid(p1, p2 + theme(legend.position="none"), 
           align="v", ncol=2)
@@ -60,5 +64,13 @@ plots <- plot_grid(p1, p2 + theme(legend.position="none"),
 legend <- get_legend(p2)
 
 #plots and legend together
-plot_grid(plots, legend, rel_widths = c(4, .5))
+p3 <- plot_grid(plots, legend, rel_widths = c(4, .5))
+p3
 
+#export png
+ggsave("text/figures/final figs/04_shape.png", p3, 
+       width=180, height=75, unit = "mm", dpi=300)
+
+#export eps
+ggsave("text/figures/final figs/04_shape.eps", p3, 
+       width=180, height=75, unit = "mm", dpi=300)

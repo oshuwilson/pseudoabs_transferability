@@ -129,7 +129,7 @@ tab <- tab %>%
   cols_width(algopseudo ~ px(140), everything() ~ px(70)) 
 tab
 
-gtsave(tab, filename = "text/figures/temp table.png")
+gtsave(tab, filename = "text/figures/final figs/t02_temp_table.docx")
 
 
 #top ranked model scores
@@ -268,7 +268,7 @@ tab <- tab %>%
   cols_width(algopseudo ~ px(140), everything() ~ px(70)) 
 tab
 
-gtsave(tab, filename = "text/figures/spat table.png")
+gtsave(tab, filename = "text/figures/final figs/t03_spat_table.docx")
 
 
 #top ranked model scores
@@ -291,7 +291,7 @@ p2 <- ggplot(best, aes(x=score)) +
   guides(fill = guide_legend(ncol=3, title = "Algorithm and Pseudo-Absence Technique")) +
   scale_x_continuous(limits = c(0,1), breaks = seq(0, 1, 0.2)) + 
   ylab("Count") + xlab("Continuous Boyce Index Score")
-p2 
+p2
 
 #plot both together
 rm(list=setdiff(ls(), c("p1", "p2")))
@@ -299,16 +299,26 @@ rm(list=setdiff(ls(), c("p1", "p2")))
 #remove legends
 p1 <- p1 + guides(fill="none")
 
-#get legend
-legend <- get_legend(p2)
-legend
-
 #add titles
 p1 <- p1 + ggtitle("Temporal Transfer")
 p2 <- p2 + ggtitle("Spatial Transfer")
 
+#customise font sizes
+p1 <- p1 + theme_classic(base_size = 7)
+p2 <- p2 + theme_classic(base_size = 7)
+
+#get legend
+legend <- get_legend(p2)
+legend
+
+#plot without legend
 plots <- plot_grid(p1, p2 + theme(legend.position="none", ncol=2, align="v"))
 plots
 
 #plots and legend together
-plot_grid(legend, plots, ncol=1, rel_heights = c(1,4))
+p3 <- plot_grid(legend, plots, ncol=1, rel_heights = c(1,4))
+p3
+
+#export
+ggsave("text/figures/final figs/s04_spat_temp_transfer.png", p3, 
+       width = 180, height = 120, units = "mm", dpi = 300)
