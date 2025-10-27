@@ -1,4 +1,6 @@
-#create Correlated Random Walk simulations from tracks
+#-------------------------------------------------------------------------------
+# Create Correlated Random Walk simulations from tracks
+#-------------------------------------------------------------------------------
 
 #clear workspace and set working directory
 rm(list=ls())
@@ -22,11 +24,17 @@ rm(list=ls())
 this.species <- "ADPE"
 this.site <- "Pointe_Geologie"
 this.stage <- "chick-rearing"
-CPF <- TRUE #central place forager? TRUE for majority of tracks except for in HUWH and SOES post-moult
+CPF <- TRUE #central place forager? TRUE except for in HUWH and post-moult/post-breeding stages
 
 
+#-------------------------------------------------------------------------------
 # 1. Read in and format tracking data for aniMotum
+#-------------------------------------------------------------------------------
+
+# read in tracks 
 tracks <- read.csv(paste0("data/tracks_by_stage/", this.species, "/", this.site, "/", this.stage, ".csv"))
+
+# format
 tracks$date <- as.POSIXct(tracks$date, format = "%Y-%m-%d %H:%M:%S")
 tracks$individual_id <- as.factor(tracks$individual_id)
 tracks <- tracks %>% select(individual_id, date, x, y, longitude_se, latitude_se)
@@ -41,7 +49,10 @@ tracks$lc <- "GL"
 tracks <- tracks %>% rename(id = individual_id, lon = x, lat = y, x.sd = longitude_se, y.sd = latitude_se)
 
 
-#2. Split each ID into trips - unenecessary for HUWH
+#-------------------------------------------------------------------------------
+# 2. Split each ID into trips - unnecessary for HUWH
+#-------------------------------------------------------------------------------
+
 tracks_by_ID <- tracks %>% group_by(id) %>%  #group_by_ID
   mutate(date0 = lag(date)) %>% #create column for date at point t-1
   mutate(timegap = interval(date0, date)/hours(1)) %>% #create column for the diff between t and t-1
@@ -70,7 +81,10 @@ tracks_by_ID <- tracks_by_ID %>% ungroup() %>%
 tracks <- tracks_by_ID
 
 
+#-------------------------------------------------------------------------------
 # 3. Create CRWs
+#-------------------------------------------------------------------------------
+
 #plot tracks
 tracks_terra <- vect(tracks,
                      geom = c("lon", "lat"),
@@ -96,8 +110,10 @@ plot(st_filter[1,])
 st_routed <- route_path(st_filter)
 plot(st_routed[1,])
 
-
+#-------------------------------------------------------------------------------
 # 4. ID erroneous tracks (5 at a time)
+#-------------------------------------------------------------------------------
+
 #these can be unrealistic (e.g. circumpolar), where track ends before returning to colony, or condensed around coastlines
 plot(st_routed[1:5, ])
 
@@ -107,7 +123,10 @@ nonCPF <- c(21, 43) #tracks that terminate without returning to/near the colony
 discard <- c(22) #tracks that appear to be resting with little movement
 
 
+#-------------------------------------------------------------------------------
 # 5. Remove erroneous tracks 
+#-------------------------------------------------------------------------------
+
 #extract error trip_IDs
 error <- c(resample, nonCPF, discard)
 errors <- filter(st_routed, row_number() %in% error)
@@ -118,7 +137,10 @@ error_IDs <- levels(errors$id)
 st_pure <- st_routed %>% filter(!id %in% error_IDs)
 
 
+#-------------------------------------------------------------------------------
 # 6. Resample CRWs
+#-------------------------------------------------------------------------------
+
 #extract IDs to be resampled
 resamples <- filter(st_routed, row_number() %in% resample)
 resamples$id <- as.factor(resamples$id)
@@ -146,8 +168,10 @@ plot(resample_st_routed[1,])
 #if yes, proceed
 st_resampled <- resample_st_routed
 
-
+#-------------------------------------------------------------------------------
 # 7. Resample Non-CPF CRWs
+#-------------------------------------------------------------------------------
+
 #extract IDs to be resampled
 nonCPFs <- filter(st_routed, row_number() %in% nonCPF)
 nonCPFs$id <- as.factor(nonCPFs$id)
@@ -180,7 +204,10 @@ st_nonCPF <- nonCPF_st_routed
 fixed_st <- rbind(st_pure, st_resampled, st_nonCPF)
 
 
+#-------------------------------------------------------------------------------
 # 8. Visualise CRWs
+#-------------------------------------------------------------------------------
+
 #extract key info from CRW models
 CRW <- fixed_st %>% unnest(cols = c(sims)) %>% 
   filter(rep!=0) %>%
@@ -196,4 +223,4 @@ plot(tracks_terra, add=T, pch=".", col="black")
 
 # 9. Format and Export
 CRW <- CRW %>% rename(x=lon, y=lat)
-write.csv(CRW, paste0("output/CRWs/", this.species, "/", this.site, "/", this.stage, ".csv"))
+write.csv(CRW, paste0("output/CRWs/", this.species, "_", this.site, "_", this.stage, ".csv"))

@@ -4,7 +4,7 @@
 
 #clear workspace and set working directory
 rm(list=ls())
-setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
+setwd("/iridisfs/scratch/jcw2g17/dsdm")
 
 #load required passages
 {
@@ -13,7 +13,6 @@ setwd("~/OneDrive - University of Southampton/Documents/Chapter 01")
   library(tidyterra)
   library(dplyr)
   library(lubridate)
-  library(CCAMLRGIS)
 }
 
 #read in coast file for masking

@@ -53,8 +53,11 @@ crw <- project(crw, "EPSG:6932")
 e <- ext(crw) 
 crop_coast <- crop(coast, e)
 
+# create minimum convex hull
+mch <- convHull(tracks)
+
 #plots
-ggplot() +
+p1 <- ggplot() +
   geom_spatvector(data = buffer, size=0.1, col = "cadetblue4") + 
   geom_spatvector(data = tracks, size=0.1, col = "black") +
   geom_spatvector(data=crop_coast, fill="grey") + 
@@ -62,29 +65,30 @@ ggplot() +
   xlim(-3066418.83637174, -2183192.10410952) +
   ylim(2858741.12954235, 3718285.10207138)
 
-ggsave(filename = "text/figures/pseudo-abs/buffer.png",
+ggsave(filename = "text/figures/pseudo-abs/buffer.png", p1,
        width = 8, height = 6)
 
-ggplot() +
-  geom_spatvector(data = background, size=0.1, col = "cadetblue") + 
+p2 <- ggplot() +
+  geom_spatvector(data = background, size=0.1, col = "cadetblue4") + 
+  geom_spatvector(data = tracks, size=0.1, col = "black") +
+  geom_spatvector(data = mch, fill = NA, linewidth = 1, col = "cadetblue4") +
+  geom_spatvector(data=crop_coast, fill="grey") + 
+  theme_void() +
+  xlim(-3066418.83637174, -2183192.10410952) +
+  ylim(2858741.12954235, 3718285.10207138)
+
+ggsave(filename = "text/figures/pseudo-abs/background.png", p2,
+       width = 8, height = 6)
+
+p3 <- ggplot() +
+  geom_spatvector(data = crw, size=0.1, col = "cadetblue4") + 
   geom_spatvector(data = tracks, size=0.1, col = "black") +
   geom_spatvector(data=crop_coast, fill="grey") + 
   theme_void() +
   xlim(-3066418.83637174, -2183192.10410952) +
   ylim(2858741.12954235, 3718285.10207138)
 
-ggsave(filename = "text/figures/pseudo-abs/background.png",
-       width = 8, height = 6)
-
-ggplot() +
-  geom_spatvector(data = crw, size=0.1, col = "cadetblue") + 
-  geom_spatvector(data = tracks, size=0.1, col = "black") +
-  geom_spatvector(data=crop_coast, fill="grey") + 
-  theme_void() +
-  xlim(-3066418.83637174, -2183192.10410952) +
-  ylim(2858741.12954235, 3718285.10207138)
-
-ggsave(filename = "text/figures/pseudo-abs/crw.png",
+ggsave(filename = "text/figures/pseudo-abs/crw.png", p3,
        width = 8, height = 6)
 
 #South Georgia S/O Map
