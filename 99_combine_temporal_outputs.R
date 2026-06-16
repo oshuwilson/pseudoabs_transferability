@@ -58,6 +58,18 @@ for(i in 1:nrow(meta)){
   glmm <- readRDS(paste0("output/temporal/glmm/", this.species, "_", this.site, "_", this.stage, "_boyce_scores_glmm.RDS"))
   glmm_self <- readRDS(paste0("output/temporal/glmm/", this.species, "_", this.site, "_", this.stage, "_self_test_glmm.RDS"))
   
+  # read in maxent
+  maxent <- readRDS(paste0("output/temporal/maxent/", this.species, "_", this.site, "_", this.stage, "_boyce_scores_maxent.RDS"))
+  maxent_self <- readRDS(paste0("output/temporal/maxent/", this.species, "_", this.site, "_", this.stage, "_self_test_maxent.RDS"))
+  
+  # read in stpps
+  stpp <- readRDS(paste0("output/temporal/stpp/", this.species, "_", this.site, "_", this.stage, "_boyce_scores_stpp.RDS"))
+  stpp_self <- readRDS(paste0("output/temporal/stpp/", this.species, "_", this.site, "_", this.stage, "_self_test_stpp.RDS"))
+  
+  # read in INLA-SDPEs
+  sdpe <- readRDS(paste0("output/temporal/sdpe/", this.species, "_", this.site, "_", this.stage, "_boyce_scores_sdpe.RDS"))
+  sdpe_self <- readRDS(paste0("output/temporal/sdpe/", this.species, "_", this.site, "_", this.stage, "_self_test_sdpe.RDS"))
+  
   # assign the algorithm to each dataframe
   rf$algorithm <- "RF"
   rf_self$algorithm <- "RF"
@@ -69,10 +81,23 @@ for(i in 1:nrow(meta)){
   gamm_self$algorithm <- "GAMM"
   glmm$algorithm <- "GLMM"
   glmm_self$algorithm <- "GLMM"
+  maxent$algorithm <- "MaxEnt"
+  maxent_self$algorithm <- "MaxEnt"
+  stpp$algorithm <- "mSTPP"
+  stpp_self$algorithm <- "mSTPP"
+  sdpe$algorithm <- "INLA-SPDE"
+  sdpe_self$algorithm <- "INLA-SPDE"
   
   # combine all algorithm dataframes
-  algos <- rbind(rf, brt, bart, gamm, glmm)
-  algos_self <- rbind(rf_self, brt_self, bart_self, gamm_self, glmm_self)
+  algos <- rbind(rf, brt, bart, gamm, glmm, maxent, stpp, sdpe)
+  algos_self <- rbind(rf_self, brt_self, bart_self, gamm_self, glmm_self, 
+                      maxent_self, stpp_self, sdpe_self)
+  
+  # make sure all are unique
+  algos <- algos %>%
+    distinct(algorithm, season, .keep_all = TRUE)
+  algos_self <- algos_self %>%
+    distinct(algorithm, season, .keep_all = TRUE)
   
   # pivot longer 
   algos <- algos %>%

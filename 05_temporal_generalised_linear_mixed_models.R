@@ -1,4 +1,7 @@
-#automated script to run GLMMs for leave-year-out validation
+#-------------------------------------------------------------------------------
+# Temporal Generalised Linear Mixed Models
+#-------------------------------------------------------------------------------
+
 
 #clear workspace and set working directory
 rm(list=ls())

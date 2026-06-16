@@ -1,5 +1,5 @@
 #-------------------------------------------------------------------------------
-# Temporal Bayesian Additive Regression Trees
+# Temporal Boosted Regression Trees
 #-------------------------------------------------------------------------------
 
 rm(list=ls())
@@ -11,18 +11,20 @@ setwd("/iridisfs/scratch/jcw2g17/dsdm/")
   library(tidymodels)
   library(themis)
   library(tidysdm)
+  library(bonsai)
   library(miceRanger)
   library(future)
 }
 
 # set number of cores for parallelisation
-cores <- 78
+cores <- 10
 
 # read in table with info for each species, site and stage
 meta <- read.csv("data/species_site_stage_metadata.csv")
 
+
 # run over each row of metadata
-for(z in 3:4){
+for(z in 2:21){
   
   # define initial predictors
   predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "slope")
@@ -34,10 +36,7 @@ for(z in 3:4){
   this.stage <- meta[z, 3]
   season <- meta[z, 4]
   
-  #-------------------------------------------------------------------------------
-  # 1. Formatting
-  #-------------------------------------------------------------------------------
-  
+  # 1. Formatting 
   #read in presences and pseudo-absences with environmental data
   data <- readRDS(paste0("output/extraction/", this.species, "_", this.site, "_", this.stage, "_extracted.rds"))
   
@@ -59,23 +58,23 @@ for(z in 3:4){
   #extract seasons for loop
   seasons <- unique(data$season)
   
-  # if ANFS, remove 2008 + 2009 (too few data for modelling to converge)
-  if(this.species == "ANFS"){
+  # if ANFS post-moult, remove 2008 + 2009 (too few data for modelling to converge)
+  if(this.species == "ANFS" & this.stage == "post-moult"){
     seasons <- seasons[!seasons %in% c(2008, 2009)]
   }
   
-  #null tables for output
-  bart_boyce_final <- NULL
+  # null tables for output
+  maxent_boyce_final <- NULL
   all_metrics <- NULL
   
   # loop over seasons
-  for(i in seasons){
+  for(i in seasons) {
     this.test <- i
     
     # define initial predictors
     predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "slope")
     
-    # if subantarctic fur seals, remove sea ice
+    # if SUFS, remove sea ice
     if(this.species == "SUFS"){
       predictors <- predictors[!predictors %in% c("sic")]
     }
@@ -83,6 +82,9 @@ for(z in 3:4){
     #extract training data
     train <- data %>%
       filter(season != this.test)
+    
+    # drop NAs
+    train <- train %>% drop_na(all_of(predictors))
     
     # isolate self-testing dataset from within training data
     self_test_inds <- train %>%
@@ -95,12 +97,6 @@ for(z in 3:4){
       select(all_of(predictors), pb, individual_id) %>%
       mutate(pb = ordered(pb, levels = c("presence", "background"))) %>%
       filter(individual_id %in% self_test_inds)
-    
-    # impute if any missing values
-    if(sum(is.na(self_test)) > 0){
-      self_mice <- miceRanger(self_test, m=1)
-      self_test <- completeData(self_mice)[[1]]
-    }
     
     # remove self-test data from training data
     train <- train %>%
@@ -129,9 +125,10 @@ for(z in 3:4){
       next
     }
     
-    #-------------------------------------------------------------------------------
-    # 2. Hyperparameter Tuning
-    #-------------------------------------------------------------------------------
+    
+#-------------------------------------------------------------------------------
+# 2. Hyperparameter Tuning
+#-------------------------------------------------------------------------------
     
     # set ideal number of cross-validation folds to 5
     v <- 5
@@ -142,19 +139,22 @@ for(z in 3:4){
       v <- n_ind
     }
     
-    #define bayesian additive regression tree settings
-    bart_mod <- parsnip::bart() %>%
+    #define maxent settings
+    max_mod <- maxent() %>%
       set_mode("classification") %>%
-      set_engine("dbarts") %>%
-      set_args(trees = tune()) #tune trees
+      set_engine("maxnet") %>% #use maxnet package 
+      set_args(feature_classes = tune(), #tune feature classes
+               regularization_multiplier = tune()) #tune regularization multiplier
     
     #create workflow
-    bart_wf <- workflow() %>%
-      add_model(bart_mod)
+    max_wf <- workflow() %>%
+      add_model(max_mod)
     
-    #define tree values to vary over 
-    trees <- c(50, 100, 200, 300)
-    grid <- expand_grid(trees = trees)
+    #create tuning grid
+    regularization_multiplier <- c(1, 2, 5, 10, 15, 20)
+    feature_classes <- c("lq", "hq", "lqp", "lqt", "hqp", "hqt", "lqhpt", "hqpt")
+    grid <- expand_grid(regularization_multiplier = regularization_multiplier,
+                        feature_classes = feature_classes) 
     
     #BUFFERS
     #isolate buffer data
@@ -164,19 +164,24 @@ for(z in 3:4){
       mutate(pb = ifelse(pb == "buffer", "background", "presence")) %>%
       mutate(pb = ordered(pb, levels = c("presence", "background")))
     
-    #check for NA - less than 10% of training data okay for imputing
-    if(sum(is.na(buff_sel)) < 0.1*nrow(buff_sel) & sum(is.na(buff_sel)) > 0){
-      buff_mice <- miceRanger(buff_sel, m=1)
-      buff_sel <- completeData(buff_mice)[[1]]
+    # limit the number of buffer points to 10000, or equal to presences if >10000 presences
+    n_buff <- buff_sel %>% filter(pb == "buffer") %>% nrow()
+    n_pres <- buff_sel %>% filter(pb == "presence") %>% nrow()
+    if(n_buff > 10000 & n_pres < 10000){
+      buff_sampled <- buff_sel %>%
+        filter(pb == "buffer") %>%
+        sample_n(size = 10000)
+      buff_sel <- buff_sel %>%
+        filter(pb == "presence") %>%
+        bind_rows(buff_sampled)
     }
-    
-    #remove columns where missing data is over 10% of rows then impute
-    if(sum(is.na(buff_sel)) > 0.1*nrow(buff_sel)){
-      buff_sel <- buff_sel[colSums(is.na(buff_sel)) < 0.1*nrow(buff_sel)]
-      if(sum(is.na(buff_sel)) > 0){
-        buff_mice <- miceRanger(buff_sel, m=1)
-        buff_sel <- completeData(buff_mice)[[1]]
-      }
+    if(n_pres > 10000){
+      buff_sampled <- buff_sel %>%
+        filter(pb == "buffer") %>%
+        sample_n(size = n_pres)
+      buff_sel <- buff_sel %>%
+        filter(pb == "presence") %>%
+        bind_rows(buff_sampled)
     }
     
     #create cross-validation folds
@@ -188,12 +193,14 @@ for(z in 3:4){
     
     #define formula for modelling
     buff_rec <- recipe(pb ~ ., data = buff_sel) %>%
-      update_role(individual_id, new_role = "ID")  %>% #let model know that id is not a predictor
-      step_downsample(pb)
-    
+      update_role(individual_id, new_role = "ID") #let model know that id is not a predictor
+      
     #update workflow
-    buff_wf <- bart_wf %>%
+    buff_wf <- max_wf %>%
       add_recipe(buff_rec)
+    
+    # set seed
+    set.seed(777)
     
     # enable parallelisation
     plan(multisession, workers = cores)
@@ -203,14 +210,15 @@ for(z in 3:4){
     
     #run models with tuning
     buff_tun <- tune_grid(buff_wf,
-                          resamples = buff_folds,
-                          grid = grid,
-                          metrics = sdm_metric_set()) #includes boyce index as a tuning parameter
-    
+                     resamples = buff_folds,
+                     grid = grid,
+                     metrics = sdm_metric_set(),
+                     control = control_grid(verbose=F)) 
+
     # end parallelisation
     plan(sequential)
-    
-    #get metric scores
+        
+    #get metric scores for each tuning value
     buff_metrics <- collect_metrics(buff_tun, summarize = T) %>%
       mutate(pb = "buffer")
     
@@ -218,10 +226,11 @@ for(z in 3:4){
     buff_best <- select_best(buff_tun, metric = "boyce_cont")
     
     #set up model
-    buff_best_mod <- bart() %>%
-      set_engine(engine = "dbarts") %>%
+    buff_best_mod <- maxent() %>%
+      set_engine(engine = "maxnet") %>%
       set_mode("classification") %>%
-      set_args(trees = buff_best$trees[1])
+      set_args(regularization_multiplier = buff_best$regularization_multiplier[1],
+               feature_classes = buff_best$feature_classes[1])
     
     #update workflow
     buff_best_wf <- buff_wf %>%
@@ -239,8 +248,11 @@ for(z in 3:4){
     buff_boyce <- boyce_cont(test, pb, buff_suitability) %>%
       pull(.estimate)
     
+    #print buffer completion
+    print("buff")
+    
     #remove unnecessary parameters to continue
-    rm(buff_sel, buff_folds, buff_rec, buff_wf, buff_grid, buff_tun, buff_best, buff_best_mod, buff_best_wf)
+    rm(buff_sel, buff_folds, buff_rec, buff_wf, buff_tun, buff_best, buff_best_mod, buff_best_wf)
     
     
     #BACKGROUND
@@ -250,19 +262,24 @@ for(z in 3:4){
       select(all_of(predictors), pb, individual_id) %>%
       mutate(pb = ordered(pb, levels = c("presence", "background")))
     
-    #check for NA - less than 10% of training data okay for imputing
-    if(sum(is.na(back_sel)) < 0.1*nrow(back_sel) & sum(is.na(back_sel)) > 0){
-      back_mice <- miceRanger(back_sel, m=1)
-      back_sel <- completeData(back_mice)[[1]]
+    # limit the number of background points only to 10000, or equal to presences if >10000 presences
+    n_back <- back_sel %>% filter(pb == "background") %>% nrow()
+    n_pres <- back_sel %>% filter(pb == "presence") %>% nrow()
+    if(n_back > 10000 & n_pres < 10000){
+      back_sampled <- back_sel %>%
+        filter(pb == "background") %>%
+        sample_n(size = 10000)
+      back_sel <- back_sel %>%
+        filter(pb == "presence") %>%
+        bind_rows(back_sampled)
     }
-    
-    #remove columns where missing data is over 10% of rows then impute
-    if(sum(is.na(back_sel)) > 0.1*nrow(back_sel)){
-      back_sel <- back_sel[colSums(is.na(back_sel)) < 0.1*nrow(back_sel)]
-      if(sum(is.na(back_sel)) > 0){
-        back_mice <- miceRanger(back_sel, m=1)
-        back_sel <- completeData(back_mice)[[1]]
-      }
+    if(n_pres > 10000){
+      back_sampled <- back_sel %>%
+        filter(pb == "background") %>%
+        sample_n(size = n_pres)
+      back_sel <- back_sel %>%
+        filter(pb == "presence") %>%
+        bind_rows(back_sampled)
     }
     
     #create cross-validation folds
@@ -274,11 +291,10 @@ for(z in 3:4){
     
     #define formula for modelling
     back_rec <- recipe(pb ~ ., data = back_sel) %>%
-      update_role(individual_id, new_role = "ID") %>% #let model know that id is not a predictor
-      step_downsample(pb)
+      update_role(individual_id, new_role = "ID") #let model know that id is not a predictor
     
     #update workflow
-    back_wf <- bart_wf %>%
+    back_wf <- max_wf %>%
       add_recipe(back_rec)
     
     # enable parallelisation
@@ -291,12 +307,13 @@ for(z in 3:4){
     back_tun <- tune_grid(back_wf,
                           resamples = back_folds,
                           grid = grid,
-                          metrics = sdm_metric_set()) #includes boyce index as a tuning parameter
+                          metrics = sdm_metric_set(), #includes boyce index as a tuning parameter
+                          control = control_grid(allow_par = F))
     
     # end parallelisation
     plan(sequential)
     
-    #get metric scores
+    #get metric scores for each tuning value
     back_metrics <- collect_metrics(back_tun, summarize = T) %>%
       mutate(pb = "background")
     
@@ -304,10 +321,11 @@ for(z in 3:4){
     back_best <- select_best(back_tun, metric = "boyce_cont")
     
     #set up model
-    back_best_mod <- bart() %>%
-      set_engine(engine = "dbarts") %>%
+    back_best_mod <- maxent() %>%
+      set_engine(engine = "maxnet") %>%
       set_mode("classification") %>%
-      set_args(trees = back_best$trees[1])
+      set_args(regularization_multiplier = back_best$regularization_multiplier[1],
+               feature_classes = back_best$feature_classes[1])
     
     #update workflow
     back_best_wf <- back_wf %>%
@@ -324,6 +342,9 @@ for(z in 3:4){
     #calculate boyce index
     back_boyce <- boyce_cont(test, pb, back_suitability) %>%
       pull(.estimate)
+    
+    #print background completion
+    print("back")
     
     #remove unnecessary parameters to continue
     rm(back_folds, back_rec, back_wf, back_tun, back_best, back_best_mod, back_best_wf)
@@ -343,19 +364,24 @@ for(z in 3:4){
       mutate(pb = ifelse(pb == "crw", "background", "presence")) %>%
       mutate(pb = ordered(pb, levels = c("presence", "background")))
     
-    #check for NA - less than 10% of training data okay for imputing
-    if(sum(is.na(crw_sel)) < 0.1*nrow(crw_sel) & sum(is.na(crw_sel)) > 0){
-      crw_mice <- miceRanger(crw_sel, m=1)
-      crw_sel <- completeData(crw_mice)[[1]]
+    # limit the number of CRW points to 10000, or equal to presences if >10000 presences
+    n_crw <- crw_sel %>% filter(pb == "crw") %>% nrow()
+    n_pres <- crw_sel %>% filter(pb == "presence") %>% nrow()
+    if(n_crw > 10000 & n_pres < 10000){
+      crw_sampled <- crw_sel %>%
+        filter(pb == "crw") %>%
+        sample_n(size = 10000)
+      crw_sel <- crw_sel %>%
+        filter(pb == "presence") %>%
+        bind_rows(crw_sampled)
     }
-    
-    #remove columns where missing data is over 10% of rows then impute
-    if(sum(is.na(crw_sel)) > 0.1*nrow(crw_sel)){
-      crw_sel <- crw_sel[colSums(is.na(crw_sel)) < 0.1*nrow(crw_sel)]
-      if(sum(is.na(crw_sel)) > 0){
-        crw_mice <- miceRanger(crw_sel, m=1)
-        crw_sel <- completeData(crw_mice)[[1]]
-      }
+    if(n_pres > 10000){
+      crw_sampled <- crw_sel %>%
+        filter(pb == "crw") %>%
+        sample_n(size = n_pres)
+      crw_sel <- crw_sel %>%
+        filter(pb == "presence") %>%
+        bind_rows(crw_sampled)
     }
     
     #create cross-validation folds
@@ -367,29 +393,29 @@ for(z in 3:4){
     
     #define formula for modelling
     crw_rec <- recipe(pb ~ ., data = crw_sel) %>%
-      update_role(individual_id, new_role = "ID") %>% #let model know that id is not a predictor
-      step_downsample(pb)
+      update_role(individual_id, new_role = "ID") #let model know that id is not a predictor
     
     #update workflow
-    crw_wf <- bart_wf %>%
+    crw_wf <- max_wf %>%
       add_recipe(crw_rec)
-    
-    # enable parallelisation
-    plan(multisession, workers = cores)
     
     # set seed
     set.seed(777)
+    
+    # enable parallelisation
+    plan(multisession, workers = cores)
     
     #run models with tuning
     crw_tun <- tune_grid(crw_wf,
                          resamples = crw_folds,
                          grid = grid,
-                         metrics = sdm_metric_set()) #includes boyce index as a tuning parameter
+                         metrics = sdm_metric_set(), #includes boyce index as a tuning parameter
+                         control = control_grid(allow_par = F)) 
     
     # end parallelisation
     plan(sequential)
     
-    #get metric scores
+    #get metric scores for each tuning value
     crw_metrics <- collect_metrics(crw_tun, summarize = T) %>%
       mutate(pb = "crw")
     
@@ -397,10 +423,11 @@ for(z in 3:4){
     crw_best <- select_best(crw_tun, metric = "boyce_cont")
     
     #set up model
-    crw_best_mod <- bart() %>%
-      set_engine(engine = "dbarts") %>%
+    crw_best_mod <- maxent() %>%
+      set_engine(engine = "maxnet") %>%
       set_mode("classification") %>%
-      set_args(trees = crw_best$trees[1])
+      set_args(regularization_multiplier = crw_best$regularization_multiplier[1],
+               feature_classes = crw_best$feature_classes[1])
     
     #update workflow
     crw_best_wf <- crw_wf %>%
@@ -418,10 +445,19 @@ for(z in 3:4){
     crw_boyce <- boyce_cont(test, pb, crw_suitability) %>%
       pull(.estimate)
     
+    #print crw completion
+    print("crw")
+    
+    #remove unnecessary parameters to continue
+    rm(crw_sel, crw_folds, crw_rec, crw_wf, crw_tun, mtry_scores, crw_best, crw_best_mod, crw_best_wf)
+    
+    #print season completion
+    print(i)
+    
     #combine boyce scores
-    bart_boyce <- expand.grid(buff = buff_boyce, back = back_boyce, crw = crw_boyce)
-    bart_boyce$season <- i
-    bart_boyce_final <- rbind(bart_boyce_final, bart_boyce)
+    maxent_boyce <- expand.grid(buff = buff_boyce, back = back_boyce, crw = crw_boyce)
+    maxent_boyce$season <- i
+    maxent_boyce_final <- rbind(maxent_boyce_final, maxent_boyce)
     
     # self test models
     self_test$buff_suitability <- predict(buff_fit, self_test, type = "prob") %>%
@@ -455,21 +491,19 @@ for(z in 3:4){
     all_metrics <- bind_rows(all_metrics, metrics)
   }
   
-  #-------------------------------------------------------------------------------
-  # 3. Export
-  #-------------------------------------------------------------------------------
+  # 4. Export
   
   # export boyce scores
-  saveRDS(bart_boyce_final, 
-          file = paste0("output/temporal/bart/", this.species, "_", this.site, "_", this.stage, "_boyce_scores_bart.RDS"))
+  saveRDS(maxent_boyce_final, 
+          file = paste0("output/temporal/maxent/", this.species, "_", this.site, "_", this.stage, "_boyce_scores_maxent.RDS"))
   
   # export metrics
   saveRDS(all_metrics,
-       file = paste0("output/temporal/bart/", this.species, "_", this.site, "_", this.stage, "_metrics_bart.RDS"))
+       file = paste0("output/temporal/maxent/", this.species, "_", this.site, "_", this.stage, "_metrics_maxent.RDS"))
   
   # export self test 
   saveRDS(all_self,
-          file = paste0("output/temporal/bart/", this.species, "_", this.site, "_", this.stage, "_self_test_bart.RDS"))
+          file = paste0("output/temporal/maxent/", this.species, "_", this.site, "_", this.stage, "_self_test_maxent.RDS"))
   
   #show species has finished
   print(paste0(this.species, " ", this.site, " ", this.stage, " success"))

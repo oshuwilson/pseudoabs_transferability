@@ -22,9 +22,6 @@ cores <- 78
 # read in table with info for each species, site and stage
 meta <- read.csv("data/species_site_stage_metadata.csv")
 
-# remove completed colonies
-#meta <- meta[-c(1:7, 9, 10, 12, 15),]
-
 # run over each row of metadata
 for(z in c(18:21)){
   

@@ -33,13 +33,6 @@ pred_gam <- function(df){
 #read in table with info for each species, site and stage
 meta <- read.csv("data/species_site_stage_metadata.csv")
 
-#remove completed stages
-# meta <- meta %>%
-#   filter(Species == "SOES" & Stage == "post-moult")
-
-#setup parallel programming
-#registerDoParallel(cores = 21)
-
 #loop to run through each species, stage, and site iteratively
 for(z in 20:21) {
   

@@ -18,7 +18,6 @@ meta <- read.csv("data/species_site_stage_metadata.csv")
 
 #define initial predictors
 predictors <- c("depth", "dshelf", "sst", "mld", "sal", "ssh", "sic", "curr", "eke", "chl", "slope")
-#meta <- meta[-c(1:15, 20:21),]
 
 #loop over every species, site, and stage
 for(z in 19:21){
