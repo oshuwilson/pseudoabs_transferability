@@ -1,6 +1,8 @@
 # pseudoabs_transferability
 
-Code accompanying the manuscript **Temporal and spatial transferability in telemetry-based dynamic species distribution models: The effects of algorithms and pseudo-absence techniques**
+Code accompanying the manuscript: 
+
+**Temporal and spatial transferability in telemetry-based dynamic species distribution models: The effects of algorithms and pseudo-absence techniques [ADD DOI]**
 
 ## Overview
 
