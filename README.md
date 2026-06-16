@@ -50,6 +50,7 @@ Analyses are conducted entirely in **R**.
 ## Citation
 
 If you use this repository, please cite the associated manuscript:
+
 Wilson et al. (2026) Temporal and spatial transferability in telemetry-based dynamic species distribution models: The effects of algorithms and pseudo-absence techniques. _Ecological Modelling_ [ADD DOI WHEN CREATED]
 
 ---
@@ -57,5 +58,7 @@ Wilson et al. (2026) Temporal and spatial transferability in telemetry-based dyn
 ## Author
 
 **Joshua C. Wilson**
+
 PhD Researcher
+
 University of Southampton and British Antarctic Survey
