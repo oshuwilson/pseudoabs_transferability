@@ -53,7 +53,8 @@ Analyses are conducted entirely in **R**.
 
 If you use this repository, please cite the associated manuscript:
 
-Wilson et al. (2026) Temporal and spatial transferability in telemetry-based dynamic species distribution models: The effects of algorithms and pseudo-absence techniques. _Ecological Modelling_ https://doi.org/10.1016/j.ecolmodel.2026.111702
+Joshua C Wilson, Philip N Trathan, Hugh J Venables, Horst Bornemann, Rochelle Constantine, Daniel P Costa, Luciano Dalla Rosa, Louise Emmerson, Ari S Friedlaender, Michael E Goebel, Simon Goldsworthy, Mark A Hindell, Mary-Anne Lea, Mônica M C Muelbert, Silvia Olmastroni, Yan Ropert-Coudert, Colin Southwell, and Ryan R Reisinger (2026). Temporal and spatial transferability in telemetry-based dynamic species distribution models: The effects of algorithms and pseudo-absence techniques, Ecological Modelling, Volume 521, 111702, https://doi.org/10.1016/j.ecolmodel.2026.111702.
+
 
 ---
 
